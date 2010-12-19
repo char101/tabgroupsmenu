@@ -7,7 +7,8 @@
     <name>TabGroups Menu</name>
     <version>0.2</version>
     <bootstrap>true</bootstrap>
-    <type>2</type>
+		<type>2</type>
+		<homepageURL>https://github.com/char101/tabgroupsmenu</homepageURL>
     <targetApplication>
       <r:Description>
         <id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
