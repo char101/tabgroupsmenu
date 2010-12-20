@@ -178,6 +178,14 @@ function processWindow(win) {
 		}
 	}
 
+	function openNewTab(event) {
+		let menu = doc.popupNode;
+		let gid = menu.value;
+		let group = GroupItems.groupItem(gid);
+		GroupItems.setActiveGroupItem(group);
+    	let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
+	}
+
 	function onGroupPopupShowing(event) {
 		deleteList = [];
 	}
@@ -649,7 +657,9 @@ function processWindow(win) {
 		
 		let groupContextMenu = $EL("menupopup", [
 			$E("menuitem", { label: "Close Group" }, { command: closeGroup }),
-			$E("menuitem", { label: "Rename Group\u2026" }, { command: renameGroup })
+			$E("menuitem", { label: "Rename Group\u2026" }, { command: renameGroup }),
+			$E("menuseparator"),
+			$E("menuitem", { label: "New Tab" }, { command: openNewTab })
 		]);
 		// Cannot hide the menu if the context is shown because then the menu will not be selected again
 		groupContextMenu.setAttribute("id", PREFIX + "group-context");
