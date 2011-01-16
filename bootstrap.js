@@ -149,7 +149,7 @@ function processWindow(win) {
 		let gid = menu.value;
 		let group = GroupItems.groupItem(gid);
 		for each(tab in gBrowser.tabs) {
-			if (tab.tabItem && tab.tabItem.parent != group) {
+			if (tab._tabViewTabItem && tab._tabViewTabItem.parent != group) {
 				gBrowser.selectedTab = tab;
 				break;
 			}
@@ -267,7 +267,7 @@ function processWindow(win) {
 		let tabindex = event.dataTransfer.mozGetDataAt("plain/text", 0);
 		let group = GroupItems.groupItem(target.value);
 		let tab = gBrowser.tabs[tabindex];
-		if (tab.tabItem && tab.tabItem.parent == group) {
+		if (tab._tabViewTabItem && tab._tabViewTabItem.parent == group) {
 			event.stopPropagation();
 			return;
 		}
@@ -284,8 +284,8 @@ function processWindow(win) {
 		let group = GroupItems.groupItem(gid);
 		let tab = gBrowser.tabs[tabindex];
 		
-		if (tab.tabItem !== undefined && tab.tabItem !== null && tab.tabItem.parent) {
-			let oldGid = tab.tabItem.parent.id;
+		if (tab._tabViewTabItem !== undefined && tab._tabViewTabItem !== null && tab._tabViewTabItem.parent) {
+			let oldGid = tab._tabViewTabItem.parent.id;
 			let mi = $(PREFIX + "tab-" + tabindex);
 		
 			// check if the menuitem are marked
@@ -302,7 +302,7 @@ function processWindow(win) {
 				queue.push(tabindex);
 			}
 
-			let oldGroup = tab.tabItem.parent;
+			let oldGroup = tab._tabViewTabItem.parent;
 			let allTabsMoved = false;
 			if (queue.length == oldGroup.getChildren().length) {
 				// all tabs are moved, if we move all tabs and there is no app tab, panorama will be shown,
@@ -498,12 +498,13 @@ function processWindow(win) {
 		let tabs = gBrowser.mTabContainer.childNodes;
 		for (let i = 0, len = tabs.length; i < len; i++) {
 			let tab = tabs[i];
-			if (! tab.tabItem || tab.tabItem.parent == null) {
+			if (! tab._tabViewTabItem || tab._tabViewTabItem.parent == null) {
 				orphanTabs.push([i, tab]);
 			} else if (! isSessionOk(tab)) {
 				invalidSessionTabs.push([i, tab]);
 			}
 		}
+		log("Got " + orphanTabs.length + " orphan tabs");
 
 		if (orphanTabs.length) {
 			if (hasGroups) {
@@ -860,7 +861,7 @@ function dumpTabsWithoutSession(win) {
 		if (tab.pinned) {
 			continue;
 		}
-		if (! tab.tabItem) {
+		if (! tab._tabViewTabItem) {
 			log("No tabitem: " + tab.getAttribute("label"));
 		} else {
 			let str = ss.getTabValue(tab, "tabview-tab");
@@ -902,7 +903,7 @@ function fixTabsSessionStore(win, GroupItems) {
 	
 	for (let i = 0, n = win.gBrowser.tabs.length; i < n; i++) {
 		let tab = win.gBrowser.tabs[i];
-		if (! tab.tabItem) {
+		if (! tab._tabViewTabItem) {
 			continue;
 		}
 		let loose = false;
@@ -924,7 +925,7 @@ function fixTabsSessionStore(win, GroupItems) {
 				BarTap.loadTabContents(tab);
 			}
 			GroupItems.moveTabToGroupItem(tab, group.id);
-			tab.tabItem.save();
+			tab._tabViewTabItem.save();
 		}
 	}
 }
