@@ -17,7 +17,8 @@ const TYPE_MAIN_POPUP = "main-popup";
 
 const POPUP_CLASS = PREFIX + "popup";
 
-let cleanupList = [];
+let globalCleanupList = {};
+let cleanupList = {};
 let started = false;
 
 function log(msg) {
@@ -34,9 +35,32 @@ function copyattr(el1, el2, attr) {
 	}
 }
 
-function set_type(el, type)  el.setAttribute(ATTR_TYPE, type);
+function set_type(el, type) {
+	el.setAttribute(ATTR_TYPE, type);
+}
 
-function remove(el) el.parentNode.removeChild(el);
+// Remove element
+function remove(el) {
+	el.parentNode.removeChild(el);
+}
+
+// Get TabItem from a tab
+function getTabItem(tab) {
+	if (typeof(tab) != 'undefined') {
+		if (tab._tabViewTabItem) {
+			// FFb11?
+			return tab._tabViewTabItem;
+		} else {
+			// <= FFb10
+			return tab.tabItem;
+		}
+	}
+}
+
+function generateID() {
+	var uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+	return uuidGenerator.generateUUID().toString();
+}
 
 // FUNCTIONAL FUNCTIONS ///////////////////////////////////////////////////////////////////////////
 
@@ -124,14 +148,25 @@ function processWindow(win) {
 		if (title) {
 			title = trim(title);
 			if (title) {
+				log('a');
 				if (GroupItems.groupItems.some(function(group) group.getTitle() == title)) {
 					win.alert("Group with title \"" + title + "\" already exists.");
 					return;
 				}
-				let GroupItem = win.TabView.getContentWindow().GroupItem;
-				let newgroup = new GroupItem(null, { title: title, immediately: true, bounds: { left: 10, top: 10, width: 50, height: 50 } });
-				newgroup.newTab();
-				let newitem = newgroup.getChild(0);
+
+				let newGroup = null;
+				
+				if (GroupItems.newGroup) {
+					// FFb11?
+					newGroup = GroupItems.newGroup();
+					newGroup.setTitle(title);
+				} else {
+					let GroupItem = win.TabView.getContentWindow().GroupItem;
+					let newGroup = new GroupItem([], { title: title, immediately: true, bounds: { left: 10, top: 10, width: 50, height: 50 } });
+				}
+				
+				newGroup.newTab();
+				let newitem = newGroup.getChild(0);
 				gBrowser.selectedTab = newitem.tab;
 			}
 		}
@@ -149,7 +184,7 @@ function processWindow(win) {
 		let gid = menu.value;
 		let group = GroupItems.groupItem(gid);
 		for each(tab in gBrowser.tabs) {
-			if (tab._tabViewTabItem && tab._tabViewTabItem.parent != group) {
+			if (getTabItem(tab) && getTabItem(tab).parent != group) {
 				gBrowser.selectedTab = tab;
 				break;
 			}
@@ -267,7 +302,7 @@ function processWindow(win) {
 		let tabindex = event.dataTransfer.mozGetDataAt("plain/text", 0);
 		let group = GroupItems.groupItem(target.value);
 		let tab = gBrowser.tabs[tabindex];
-		if (tab._tabViewTabItem && tab._tabViewTabItem.parent == group) {
+		if (getTabItem(tab) && getTabItem(tab).parent == group) {
 			event.stopPropagation();
 			return;
 		}
@@ -284,8 +319,8 @@ function processWindow(win) {
 		let group = GroupItems.groupItem(gid);
 		let tab = gBrowser.tabs[tabindex];
 		
-		if (tab._tabViewTabItem !== undefined && tab._tabViewTabItem !== null && tab._tabViewTabItem.parent) {
-			let oldGid = tab._tabViewTabItem.parent.id;
+		if (getTabItem(tab) !== undefined && getTabItem(tab) !== null && getTabItem(tab).parent) {
+			let oldGid = getTabItem(tab).parent.id;
 			let mi = $(PREFIX + "tab-" + tabindex);
 		
 			// check if the menuitem are marked
@@ -302,7 +337,7 @@ function processWindow(win) {
 				queue.push(tabindex);
 			}
 
-			let oldGroup = tab._tabViewTabItem.parent;
+			let oldGroup = getTabItem(tab).parent;
 			let allTabsMoved = false;
 			if (queue.length == oldGroup.getChildren().length) {
 				// all tabs are moved, if we move all tabs and there is no app tab, panorama will be shown,
@@ -498,7 +533,7 @@ function processWindow(win) {
 		let tabs = gBrowser.mTabContainer.childNodes;
 		for (let i = 0, len = tabs.length; i < len; i++) {
 			let tab = tabs[i];
-			if (! tab._tabViewTabItem || tab._tabViewTabItem.parent == null) {
+			if (! getTabItem(tab) || getTabItem(tab).parent == null) {
 				orphanTabs.push([i, tab]);
 			} else if (! isSessionOk(tab)) {
 				invalidSessionTabs.push([i, tab]);
@@ -598,31 +633,6 @@ function processWindow(win) {
 		};
 	}
 
-	function setupStylesheet() {
-		let ss = doc.styleSheets[0];
-		let ssfrom = ss.cssRules.length;
-		let rules = [
-			".menuitem-iconic > .menu-iconic-left > .menu-iconic-icon { width: 16px; height: 16px; list-style-image: url(chrome://global/skin/icons/folder-item.png); -moz-image-region: rect(0px, 16px, 16px, 0px); }",
-			".menuitem-iconic[busy] > .menu-iconic-left > .menu-iconic-icon { list-style-image: url('chrome://global/skin/throbber/Throbber-small.gif') !important; }",
-			".menu-iconic > .menu-iconic-left > .menu-iconic-icon { list-style-image: url('chrome://browser/skin/tabview/tabview.png'); -moz-image-region: rect(0px, 90px, 16px, 72px); }",
-			".menu-iconic:-moz-drag-over { text-decoration: underline; border: 1px dotted #666; }",
-			".current > .menu-iconic-text { font-weight: bold; }",
-			"menuitem.marked .menu-iconic-text { color: #0000FF !important; }",
-			"menuitem.unloaded .menu-iconic-text { color: #777; }",
-			"menuitem.fake .menu-iconic-text { color: #B60000; }",
-			"menu.loading > .menu-iconic-left > .menu-iconic-icon { list-style-image: url(chrome://browser/skin/places/searching_16.png); }"
-		];
-		rules.forEach(function(rule) {
-			ss.insertRule("." + POPUP_CLASS + " " + rule, ss.cssRules.length);
-		});
-
-		return function() {
-			for (let i = ssfrom + rules.length - 1; i >= ssfrom; --i) {
-				ss.deleteRule(i);
-			}
-		};
-	}
-
 	function setupUiButton() {
 		// Embed in tabview button
 		let tabviewButton = doc.getElementById("tabview-button");
@@ -693,28 +703,37 @@ function processWindow(win) {
 	}
 
 	// CLEANUP ///////////////////////////////////////////////////////////////////////////////////////
-	let clids = [];
-	clids.push(cleanupList.push(setupMenu()));
-	clids.push(cleanupList.push(setupStylesheet()));
-	clids.push(cleanupList.push(setupUiButton()));
-	clids.push(cleanupList.push(setupContextMenu()));
+	let windowId = generateID();
+	cleanupList[windowId] = [setupMenu(), setupUiButton(), setupContextMenu()];
 	
 	function onWindowUnload() {
-		clids.forEach(function(id) cleanupList[id-1] = null);
+		delete cleanupList[windowId];
+		delete globalCleanupList[windowId];
 	}
 	win.addEventListener("unload", onWindowUnload, false);
+	globalCleanupList[windowId] = function() {
+		win.removeEventListener("unload", onWindowUnload, false);
+	};
 	// END CLEANUP ///////////////////////////////////////////////////////////////////////////////////
 }
 
 // EXTENSION FUNCTIONS ////////////////////////////////////////////////////////////////////////////
 
-function startup() {
+function startup(data, reason) {
 	if (started) return; 
 	started = true;
 
 	// {{
 	log("startup");
 	// }}
+	
+	// Add resource alias
+	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
+  	let alias = Services.io.newFileURI(data.installPath);
+	if (! data.installPath.isDirectory()) {
+		alias = Services.io.newURI("jar:" + alias.spec + "!/", null, null);
+	}
+	resource.setSubstitution("tabgroupsmenu", alias);
 
 	let browserWins = Services.wm.getEnumerator("navigator:browser");
 	
@@ -733,23 +752,62 @@ function startup() {
 		subject.addEventListener("load", winLoad, false);
 	}
 	Services.ww.registerNotification(windowHandler);
-	cleanupList.push(function() Services.ww.unregisterNotification(windowHandler));
+	globalCleanupList.ww = function() {
+		Services.ww.unregisterNotification(windowHandler)
+	};
+
+	// Load stylesheet
+	let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
+	let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+	let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
+	styleSheetService.loadAndRegisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 
 	// {{
 	startDebugger();
 	// }}
 }
 
-function shutdown() {
+function shutdown(data, reason) {
+	if (reason == APP_SHUTDOWN) return;
+	
 	if (! started) return;
 	started = false;
 
 	// {{
 	log("shutdown");
 	// }}
+
+  	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
+  	resource.setSubstitution("tabgroupsmenu", null);
 	
-	for (let [, cleaner] in Iterator(cleanupList)) {
-		cleaner && cleaner();
+	for each (let funcs in cleanupList) {
+		for ([, f] in Iterator(funcs)) {
+			try { 
+				f(); 
+			} catch (e) {
+				// {{
+				log(e);
+				// }}
+			}
+		}
+	}
+
+	for each (let f in globalCleanupList) {
+		try {
+			f();
+		} catch (e) {
+			// {{
+			log(e);
+			// }}
+		}
+	}
+
+	// Unload stylesheet
+	let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
+	let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+	let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
+	if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET)) {
+		styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 	}
 
 	// {{
@@ -757,12 +815,12 @@ function shutdown() {
 	// }}
 }
 
-function install() {
-	startup(); 
+function install(data, reason) {
+	startup(data, reason); 
 }
 
-function uninstall() { 
-	shutdown();
+function uninstall(data, reason) { 
+	shutdown(data, reason);
 }
 
 // {{
@@ -861,7 +919,7 @@ function dumpTabsWithoutSession(win) {
 		if (tab.pinned) {
 			continue;
 		}
-		if (! tab._tabViewTabItem) {
+		if (! getTabItem(tab)) {
 			log("No tabitem: " + tab.getAttribute("label"));
 		} else {
 			let str = ss.getTabValue(tab, "tabview-tab");
@@ -903,7 +961,7 @@ function fixTabsSessionStore(win, GroupItems) {
 	
 	for (let i = 0, n = win.gBrowser.tabs.length; i < n; i++) {
 		let tab = win.gBrowser.tabs[i];
-		if (! tab._tabViewTabItem) {
+		if (! getTabItem(tab)) {
 			continue;
 		}
 		let loose = false;
@@ -925,7 +983,7 @@ function fixTabsSessionStore(win, GroupItems) {
 				BarTap.loadTabContents(tab);
 			}
 			GroupItems.moveTabToGroupItem(tab, group.id);
-			tab._tabViewTabItem.save();
+			getTabItem(tab).save();
 		}
 	}
 }

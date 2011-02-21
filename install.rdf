@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <r:RDF xmlns="http://www.mozilla.org/2004/em-rdf#"
-       xmlns:r="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+	xmlns:r="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
   <r:Description about="urn:mozilla:install-manifest">
     <creator>Charles G.</creator>
     <id>tabgroupsmenu@char.cc</id>
@@ -16,5 +16,6 @@
         <maxVersion>4.0b9pre</maxVersion>
       </r:Description>
     </targetApplication>
-  </r:Description>
+		<iconURL>resource://tabgroupsmenu/icon.png</iconURL>
+	</r:Description>
 </r:RDF>

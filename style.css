@@ -1,0 +1,20 @@
+.grouptabs-popup .menuitem-iconic > .menu-iconic-left > .menu-iconic-icon {
+  width: 16px;
+  height: 16px;
+  list-style-image: url(chrome://global/skin/icons/folder-item.png);
+  -moz-image-region: rect(0px, 16px, 16px, 0px);
+}
+.grouptabs-popup .menuitem-iconic[busy] > .menu-iconic-left > .menu-iconic-icon { list-style-image: url('chrome://global/skin/throbber/Throbber-small.gif') !important; }
+.grouptabs-popup .menu-iconic > .menu-iconic-left > .menu-iconic-icon {
+  list-style-image: url('chrome://browser/skin/tabview/tabview.png');
+  -moz-image-region: rect(0px, 90px, 16px, 72px);
+}
+.grouptabs-popup .menu-iconic:-moz-drag-over {
+  text-decoration: underline;
+  border: 1px dotted #666666;
+}
+.grouptabs-popup .current > .menu-iconic-text { font-weight: bold !important; }
+.grouptabs-popup menuitem.marked .menu-iconic-text { color: #0000ff !important; }
+.grouptabs-popup menuitem.unloaded .menu-iconic-text { color: #777777; }
+.grouptabs-popup menuitem.fake .menu-iconic-text { color: #b60000; }
+.grouptabs-popup menu.loading > .menu-iconic-left > .menu-iconic-icon { list-style-image: url(chrome://browser/skin/places/searching_16.png); }

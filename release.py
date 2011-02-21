@@ -13,6 +13,11 @@ version = sys.argv[1]
 
 zf = zipfile.ZipFile("tabgroupsmenu@char.cc-%s.xpi" % version, 'w', zipfile.ZIP_DEFLATED)
 
+zf.write('bootstrap.js', 'bootstrap-debug.js')
+zf.write('style.less')
+zf.write('style.css')
+zf.write('icon.png')
+
 fin  = open('bootstrap.js', 'r')
 fout = StringIO()
 
