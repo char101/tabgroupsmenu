@@ -1,13 +1,9 @@
-// Some code/ideas borrowed from Restartless Restart extension
-
 const Cu = Components.utils;
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AddonManager.jsm");
-
-let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 const global = this;
@@ -28,23 +24,8 @@ function set_type(el, type) {
 	el.setAttribute(ATTR_TYPE, type);
 }
 
-// Get TabItem from a tab
-function getTabItem(tab) {
-	if (typeof(tab) != 'undefined') {
-		if (tab._tabViewTabItem) {
-			// FFb11?
-			return tab._tabViewTabItem;
-		} else {
-			// <= FFb10
-			return tab.tabItem;
-		}
-	}
-}
-
 // ChromeWindow -> document -> window [#main-window] -> tabbrowser -> tab -> browser -> [contentWindow | contentDocument]
 function processWindow(win) {
-	dumpSession(win);
-	
 	// win: ChromeWindow
 	let doc = win.document; // XULDocument
 	let gBrowser = win.gBrowser; // tabbrowser -> has tabContainer (tabs)
@@ -85,11 +66,6 @@ function processWindow(win) {
 		let el = doc.createElementNS(XUL_NS, tag);
 		children.forEach(function(child) el.appendChild(child));
 		return el;
-	}
-
-	function isSessionOk(tab) {
-		let str = ss.getTabValue(tab, "tabview-tab");
-		return ! (str === undefined || str === "");
 	}
 
 	function currentPopup() {
@@ -182,14 +158,17 @@ function processWindow(win) {
 
 	function selectGroupEventHandler(event) {
 		if (event.button == 0) {
-			event.stopPropagation();
-			
 			let groupItem = GroupItems.groupItem(event.target.value);
-			let activeGroupItem = GroupItems.getActiveGroupItem();
-			if (groupItem == activeGroupItem) {
-				return;
-			}
-			selectGroup(groupItem);
+            if (groupItem) {
+                let activeGroupItem = GroupItems.getActiveGroupItem();
+                if (groupItem == activeGroupItem) {
+                    return;
+                }
+                selectGroup(groupItem);
+                
+                event.stopPropagation();
+                event.preventDefault();
+            }
 		}
 	}
 
@@ -207,7 +186,8 @@ function processWindow(win) {
 			}
 		}
 		if (tabItem) {
-			GroupItems.updateActiveGroupItemAndTabBar(tabItem);
+            gBrowser.selectedTab = tabItem.tab;
+			//GroupItems.updateActiveGroupItemAndTabBar(tabItem);
 			closeMenu();
 		} else {
 			GroupItems.setActiveGroupItem(groupItem);
@@ -268,7 +248,7 @@ function processWindow(win) {
 	function onTabDragStart(event) {
 		let mi = event.target;
 		let tab = gBrowser.tabs[mi.value];
-		if (! tab.pinned && isSessionOk(tab)) {
+		if (! tab.pinned) {
 			let dt = event.dataTransfer;
 			dt.effectAllowed = "move";
 			dt.dropEffect = "move";
@@ -390,32 +370,30 @@ function processWindow(win) {
 		if (children.length > 0) {
 			group.getChildren().forEach(function(tabitem) {
 				tab = tabitem.tab;
-				if (isSessionOk(tab)) {
-					let cls = "menuitem-iconic";
-					if (tab.selected) {
-						cls += " current";
-					} else if (isUnloaded(tab)) {
-						cls += " unloaded";
-					}
-					let tabindex = tabs.getIndexOfItem(tab);
-					let mi = $E("menuitem", {
-						id: PREFIX + "tab-" + tabindex,
-						class: cls,
-						label: $A(tab, "label"),
-						value: tabindex
-					});
-					set_type(mi, TYPE_GROUPTAB);
-					copyattr(mi, tab, "image");
-					copyattr(mi, tab, "busy");
-					mi.addEventListener("command", selectTab, false);
-					mi.addEventListener("dragstart", onTabDragStart, false);
-					mi.addEventListener("click", onTabClick, false);
-					mi.addEventListener("contextmenu", (function(event) {
-						event.preventDefault();
-						event.stopPropagation();
-					}), false);
-					mp.appendChild(mi);
-				}
+                let cls = "menuitem-iconic";
+                if (tab.selected) {
+                    cls += " current";
+                } else if (isUnloaded(tab)) {
+                    cls += " unloaded";
+                }
+                let tabindex = tabs.getIndexOfItem(tab);
+                let mi = $E("menuitem", {
+                    id: PREFIX + "tab-" + tabindex,
+                    class: cls,
+                    label: $A(tab, "label"),
+                    value: tabindex
+                });
+                set_type(mi, TYPE_GROUPTAB);
+                copyattr(mi, tab, "image");
+                copyattr(mi, tab, "busy");
+                mi.addEventListener("command", selectTab, false);
+                mi.addEventListener("dragstart", onTabDragStart, false);
+                mi.addEventListener("click", onTabClick, false);
+                mi.addEventListener("contextmenu", (function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }), false);
+                mp.appendChild(mi);
 			});
 		} else {
 			// Group does not have tab so we add our new tab menu item
@@ -532,20 +510,15 @@ function processWindow(win) {
 			popup.appendChild(m);
 		});
 
-		// List of tabs not under any group
+		// List of tabs not under any group (most probably app tabs)
 		let orphanTabs = [];
-		let invalidSessionTabs = [];
 		let tabs = gBrowser.tabContainer.childNodes;
 		for (let i = 0, len = tabs.length; i < len; i++) {
 			let tab = tabs[i];
 			if (! getTabItem(tab) || getTabItem(tab).parent == null) {
 				orphanTabs.push([i, tab]);
-			} else if (! isSessionOk(tab)) {
-				invalidSessionTabs.push([i, tab]);
 			}
 		}
-		LOG("Got " + orphanTabs.length + " orphan tabs");
-
 		if (orphanTabs.length) {
 			if (hasGroups) {
 				popup.appendChild($E("menuseparator"));
@@ -564,39 +537,6 @@ function processWindow(win) {
 					value: index,
 					"class": cls,
 					label: $A(tab, "label"),
-					ATTR_TYPE: TYPE_TAB
-				});
-				copyattr(mi, tab, "image");
-				copyattr(mi, tab, "busy");
-				if ($A(tab, "selected")) {
-					mi.setAttribute("style", "font-weight: bold");
-				}
-				mi.addEventListener("command", selectTab, false);
-				mi.addEventListener("dragstart", onTabDragStart, false);
-				mi.addEventListener("click", onTabClick, false);
-				popup.appendChild(mi);
-			});
-		}
-
-		if (invalidSessionTabs.length) {
-			if (orphanTabs.length) {
-				popup.appendChild($E("menuseparator"));
-			}
-			invalidSessionTabs.forEach(function(arr) {
-				let index = arr[0];
-				let tab = arr[1];
-				let cls = "menuitem-iconic";
-				if (tab.selected) {
-					cls += " current";
-				} else if (isUnloaded(tab)) {
-					cls += " unloaded";
-				}
-				cls += " fake";
-				let mi = $E("menuitem", {
-					id: PREFIX + "tab-" + index,
-					value: index,
-					"class": cls,
-					label: tabutil.getTitle(tab),
 					ATTR_TYPE: TYPE_TAB
 				});
 				copyattr(mi, tab, "image");
@@ -672,12 +612,6 @@ function processWindow(win) {
 		};
 	}
 
-	function sortAllGroups() {
-		GroupItems.groupItems.forEach(function(groupItem) {
-			groupItem.reorderTabsBasedOnTabItemOrder();
-		});
-	}
-
 	function setupContextMenu() {
 		let parent = $("mainPopupSet");
 		
@@ -691,108 +625,14 @@ function processWindow(win) {
 		groupContextMenu.setAttribute("id", PREFIX + "group-context");
 		parent.appendChild(groupContextMenu);
 
-		let debugContext = $EL("menupopup", [
-			// $E("menuitem", { label: "Fix tab sessionstore" }, { command: function() fixTabsSessionStore(win, GroupItems) }),
-			// $E("menuitem", { label: "Dump visible tabs" }, { command: function() dumpVisibleTabs(win) }),
-			/* $E("menuitem", { label: "Dump orphaned tabs" }, { command: function() {
-				if (! GroupItems) {
-					win.alert("Click the menu first to load panorama");
-					return;
-				}
-				let tabs = GroupItems.getOrphanedTabs();
-				if (tabs.length > 0) {
-					tabs.forEach(function(tabitem) LOG(tabitem.tab.getAttribute("label")));
-				} else {
-					LOG("No orphaned tabs");
-				}
-			}}), */
-			// $E("menuitem", { label: "Dump tabs without session" }, { command: function() dumpTabsWithoutSession(win) }),
-			$E("menuitem", { label: "Resort all groups tabs" }, { command: sortAllGroups })
-		]);
-		debugContext.setAttribute("id", PREFIX + "extra-context");
-		parent.appendChild(debugContext);
-		
 		return function() {
 			parent.removeChild(groupContextMenu);
-			parent.removeChild(debugContext);
 		};
 	}
 	
 	unload(setupMenu(), win);
 	unload(setupUiButton(), win);
 	unload(setupContextMenu(), win);
-
-	/* if (getPref('preventSwitchingGroupOnTabClose')) {
-		let lastGroupBeforeClose = null;
-		let isTabClosed = false;
-
-		// The main problem is probably selectTabOWnerOnClose
-		// If the owner is in different tabgroups, then the group jumping will occur
-		// Simply set selectTabOwnerOnClose to false to prevent tab jumping behavior
-		// Firefox code already uses visibleTabs to determine right/left tab (first it check for right tab and then left tab)
-		
-		// Called just before the tab is closed, so current tab is still the to be closed tab
-		function onTabClose(event) {
-			let aTab = event.target;
-			LOG('[onTabClose] aTab._tabViewTabItem: ' + aTab._tabViewTabItem);
-			if (tabutil.getTabGroupItem(aTab) == tabutil.getTabGroupItem(gBrowser.selectedTab)) {
-				return;
-			}
-			
-			LOG('[onTabClose] closed tab: ' + tabutil.getTitle(aTab));
-
-			let groupItem = tabutil.getTabGroupItem(aTab);
-			let tabItem = groupItem.getActiveTab();
-			if (! tabItem) {
-				tabItem = groupItem.getChild(0);
-			}
-			if (tabItem) {
-				tab = tabItem.tab;
-			}
-
-			LOG('[onTabClose] Selected tab: ' + tabutil.getTitle(tab));
-			gBrowser.selectedTab = tab;
-		} */
-
-		/* function onTabSelect(event) {
-			LOG('[onTabSelect] selected tab: ' + tabutil.getTitle(gBrowser.selectedTab));
-			if (! isTabClosed || ! lastGroupBeforeClose)
-				return;
-
-			LOG('[onTabSelect] after close');
-
-			// not sure whether to change group if this group is empty
-			//if (lastGroupBeforeClose.hidden || lastGroupBeforeClose.isEmpty())
-			//	return;
-			
-			let newGroupItem = getTabItem(gBrowser.selectedTab).parent 
-			if (newGroupItem != lastGroupBeforeClose) {
-				LOG('Current tab group (' + newGroupItem.getTitle() + ') is different with closed tab tabgroup (' + lastGroupBeforeClose.getTitle() + '), switching to old tab group');
-				selectGroup(lastGroupBeforeClose);
-				event.preventDefault();
-				event.stopPropagation();
-			}
-			
-			isTabClosed = false;
-			lastGroupBeforeClose = null;
-		} */
-
-		/* function setupTabCloseHandler() {
-			// gBrowser.tabContainer.addEventListener("TabSelect", onTabSelect, false);
-			gBrowser.tabContainer.addEventListener("TabClose", onTabClose, false);
-			return function() {
-				gBrowser.tabContainer.removeEventListener("TabClose", onTabSelect, false);
-				// gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelect, false);
-			}
-		}
-		
-		unload(setupTabCloseHandler(), win);
-
-		let unlinkedGroupItem = null;
-		function onTabItemClose(tabItem, eventInfo) {
-			unlinkedGroupItem = 
-		}
-	} */
 }
 
 function startup(data, reason) {
@@ -802,8 +642,6 @@ function startup(data, reason) {
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/tab.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/debug.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/prefs.js").spec, global);
-		
-		LOG("startup");
 		
 		startDebugger();
 		unload(stopDebugger);
@@ -822,7 +660,7 @@ function startup(data, reason) {
 		// Load stylesheet
 		let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
 		let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-		let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
+		let styleUri = ioService.newURI("resource://tabgroupsmenu/res/style.css", null, null);
 		styleSheetService.loadAndRegisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 		unload(function() {
 			if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET))

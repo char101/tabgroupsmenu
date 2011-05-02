@@ -1,3 +1,6 @@
+// Get TabItem from a tab
+function getTabItem(tab) tab._tabViewTabItem;
+
 let tabutil = {
 	getTitle: function tabutil_getTitle(tab) {
 		return tab.getAttribute('label');
