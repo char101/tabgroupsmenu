@@ -1,10 +1,17 @@
 // Some code/ideas borrowed from Restartless Restart extension
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+const Cu = Components.utils;
+const Cc = Components.classes;
+const Ci = Components.interfaces;
+
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/AddonManager.jsm");
+
 let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
 
-const NS_XUL = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+const global = this;
+
 const PREFIX = "grouptabs-";
 const MENUID = PREFIX + "menu";
 const MENUBTN = PREFIX + "btn";
@@ -17,31 +24,8 @@ const TYPE_MAIN_POPUP = "main-popup";
 
 const POPUP_CLASS = PREFIX + "popup";
 
-let globalCleanupList = {};
-let cleanupList = {};
-let started = false;
-
-function log(msg) {
-	let cs = Cc["@mozilla.org/consoleservice;1"].getService(Ci.nsIConsoleService);
-	if (typeof(msg) == "object") {
-		msg = Cc["@mozilla.org/dom/json;1"].createInstance(Ci.nsIJSON).encode(msg);
-	}
-	cs.logStringMessage("tabgroupsmenu: " + msg);
-}
-
-function copyattr(el1, el2, attr) {
-	if (el2.hasAttribute(attr)) {
-		el1.setAttribute(attr, el2.getAttribute(attr));
-	}
-}
-
 function set_type(el, type) {
 	el.setAttribute(ATTR_TYPE, type);
-}
-
-// Remove element
-function remove(el) {
-	el.parentNode.removeChild(el);
 }
 
 // Get TabItem from a tab
@@ -57,37 +41,29 @@ function getTabItem(tab) {
 	}
 }
 
-function generateID() {
-	var uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
-	return uuidGenerator.generateUUID().toString();
-}
-
-// FUNCTIONAL FUNCTIONS ///////////////////////////////////////////////////////////////////////////
-
 // ChromeWindow -> document -> window [#main-window] -> tabbrowser -> tab -> browser -> [contentWindow | contentDocument]
 function processWindow(win) {
-	// {{
 	dumpSession(win);
-	// }}
 	
 	// win: ChromeWindow
 	let doc = win.document; // XULDocument
-	let gBrowser = win.gBrowser; // XULElement(tabbrowser)
+	let gBrowser = win.gBrowser; // tabbrowser -> has tabContainer (tabs)
 	// set GroupItems when the menu is shown
 	let tabviewWindow = win.TabView.getContentWindow();
 	let GroupItems = null;
 	if (tabviewWindow) {
 		GroupItems = tabviewWindow.GroupItems;
 	}
+	let gTabView = gBrowser.TabView;
 	let deleteList = [];
 
 	// Get element with id
 	function $(id) doc.getElementById(id);
 	function $A(el, attr, def) (el.hasAttribute(attr) ? el.getAttribute(attr) : def);
-	
+
 	// Create element with optional properties
 	function $E(tag, props, eventhandlers) {
-		let el = doc.createElementNS(NS_XUL, tag);
+		let el = doc.createElementNS(XUL_NS, tag);
 		if (props) {
 			for (let key in props) {
 				if (key == "value") {
@@ -106,18 +82,9 @@ function processWindow(win) {
 	}
 
 	function $EL(tag, children) {
-		let el = doc.createElementNS(NS_XUL, tag);
+		let el = doc.createElementNS(XUL_NS, tag);
 		children.forEach(function(child) el.appendChild(child));
 		return el;
-	}
-
-	// From: http://blog.stevenlevithan.com/archives/faster-trim-javascript
-	function trim(str) {
-		str = str.replace(/^\s\s*/, '');
-		let ws = /\s/;
-		let i = str.length;
-		while (ws.test(str.charAt(--i)));
-		return str.slice(0, i + 1);
 	}
 
 	function isSessionOk(tab) {
@@ -140,15 +107,15 @@ function processWindow(win) {
 	}
 
 	function selectTab(event) {
-		gBrowser.mTabContainer.selectedIndex = event.target.value;
+		gBrowser.tabContainer.selectedIndex = event.target.value;
 	}
 	
 	function createGroup(event) {
 		let title = win.prompt("Enter group title (required):");
 		if (title) {
-			title = trim(title);
+			title = title.trim();
 			if (title) {
-				log('a');
+				LOG('a');
 				if (GroupItems.groupItems.some(function(group) group.getTitle() == title)) {
 					win.alert("Group with title \"" + title + "\" already exists.");
 					return;
@@ -175,7 +142,7 @@ function processWindow(win) {
 	function openNewTabInGroup(event) {
 		let group = GroupItems.groupItem(event.target.value);
 		GroupItems.setActiveGroupItem(group);
-    	let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
+		let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
 	}
 
 	// Todo: select unloaded tab
@@ -202,7 +169,7 @@ function processWindow(win) {
 		let group = GroupItems.groupItem(gid);
 		let newname = win.prompt("New group name: ", group.getTitle());
 		if (newname) {
-			newname = trim(newname);
+			newname = newname.trim();
 			if (newname && newname != group.getTitle()) {
 				if (GroupItems.groupItems.some(function(group) group.getTitle() == newname)) {
 					win.alert("Group with title \"" + title + "\" already exists.");
@@ -213,12 +180,46 @@ function processWindow(win) {
 		}
 	}
 
+	function selectGroupEventHandler(event) {
+		if (event.button == 0) {
+			event.stopPropagation();
+			
+			let groupItem = GroupItems.groupItem(event.target.value);
+			let activeGroupItem = GroupItems.getActiveGroupItem();
+			if (groupItem == activeGroupItem) {
+				return;
+			}
+			selectGroup(groupItem);
+		}
+	}
+
+	function selectGroup(groupItem) {
+		// restore the last active tab in the group
+		let activeTab = groupItem.getActiveTab();
+		let tabItem = null;
+		if (activeTab) {
+			tabItem = activeTab;
+		} else {
+			// if not tab is active, use the first one
+			var child = groupItem.getChild(0)
+			if (child) {
+				tabItem = child;
+			}
+		}
+		if (tabItem) {
+			GroupItems.updateActiveGroupItemAndTabBar(tabItem);
+			closeMenu();
+		} else {
+			GroupItems.setActiveGroupItem(groupItem);
+		}
+	}
+
 	function openNewTab(event) {
 		let menu = doc.popupNode;
 		let gid = menu.value;
 		let group = GroupItems.groupItem(gid);
 		GroupItems.setActiveGroupItem(group);
-    	let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
+		let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
 	}
 
 	function onGroupPopupShowing(event) {
@@ -318,9 +319,10 @@ function processWindow(win) {
 		let gid = menu.value;
 		let group = GroupItems.groupItem(gid);
 		let tab = gBrowser.tabs[tabindex];
+		let oldGid = null;
 		
 		if (getTabItem(tab) !== undefined && getTabItem(tab) !== null && getTabItem(tab).parent) {
-			let oldGid = getTabItem(tab).parent.id;
+			oldGid = getTabItem(tab).parent.id;
 			let mi = $(PREFIX + "tab-" + tabindex);
 		
 			// check if the menuitem are marked
@@ -348,15 +350,15 @@ function processWindow(win) {
 				let index = queue[i];
 				GroupItems.moveTabToGroupItem(gBrowser.tabs[index], gid);
 				if (allTabsMoved && i == 0) {
-					gBrowser.mTabContainer.selectedIndex = index;
+					gBrowser.tabContainer.selectedIndex = index;
 				}
 			};
 		} else {
 			// Dropping orphaned tab
 			GroupItems.moveTabToGroupItem(tab, gid);
 		}
-			
-		group.reorderTabItemsBasedOnTabOrder();
+
+		group.reorderTabsBasedOnTabItemOrder();
 		
 		// Updating menu works but the drop target styles doesn't seems cleared
 		closeMenu();
@@ -375,7 +377,7 @@ function processWindow(win) {
 		let mp = event.target; // menupopup
 		let gid = event.target.parentNode.value; // tabgroup id
 		let group = GroupItems.groupItem(gid);
-		let tabs = gBrowser.mTabContainer;
+		let tabs = gBrowser.tabContainer;
 		
 		group.reorderTabItemsBasedOnTabOrder();
 		
@@ -467,7 +469,7 @@ function processWindow(win) {
 					menu.open = true;
 				});
 				// {{
-				log("Panorama loaded");
+				LOG("Panorama loaded");
 				// }}
 			}
 		} else {
@@ -518,6 +520,9 @@ function processWindow(win) {
 			m.addEventListener("dragenter", onTabDragEnter, false);
 			m.addEventListener("dragover", onTabDragOver, false);
 			m.addEventListener("drop", onTabDrop, false);
+
+			// Select tab in group by clicking on the group title
+			m.addEventListener("click", selectGroupEventHandler, true);
 			
 			let mp = $E("menupopup", { id: PREFIX + "group-popup-" + arr[1] });
 			mp.addEventListener("popupshowing", showGroupTabsMenu, false);
@@ -530,7 +535,7 @@ function processWindow(win) {
 		// List of tabs not under any group
 		let orphanTabs = [];
 		let invalidSessionTabs = [];
-		let tabs = gBrowser.mTabContainer.childNodes;
+		let tabs = gBrowser.tabContainer.childNodes;
 		for (let i = 0, len = tabs.length; i < len; i++) {
 			let tab = tabs[i];
 			if (! getTabItem(tab) || getTabItem(tab).parent == null) {
@@ -539,7 +544,7 @@ function processWindow(win) {
 				invalidSessionTabs.push([i, tab]);
 			}
 		}
-		log("Got " + orphanTabs.length + " orphan tabs");
+		LOG("Got " + orphanTabs.length + " orphan tabs");
 
 		if (orphanTabs.length) {
 			if (hasGroups) {
@@ -591,7 +596,7 @@ function processWindow(win) {
 					id: PREFIX + "tab-" + index,
 					value: index,
 					"class": cls,
-					label: $A(tab, "label"),
+					label: tabutil.getTitle(tab),
 					ATTR_TYPE: TYPE_TAB
 				});
 				copyattr(mi, tab, "image");
@@ -616,6 +621,10 @@ function processWindow(win) {
 			accesskey: "G",
 			context: PREFIX + "extra-context"
 		});
+		if (getPref('openOnMouseOver')) {
+			tabsMenu.addEventListener("mouseover", function(event) this.open = true, true);
+			tabsMenu.addEventListener("click", function(event) this.open = true, true);
+		}
 		menubar.insertBefore(tabsMenu, menubar.lastChild);
 		
 		// the default reads from context attribute
@@ -663,6 +672,12 @@ function processWindow(win) {
 		};
 	}
 
+	function sortAllGroups() {
+		GroupItems.groupItems.forEach(function(groupItem) {
+			groupItem.reorderTabsBasedOnTabItemOrder();
+		});
+	}
+
 	function setupContextMenu() {
 		let parent = $("mainPopupSet");
 		
@@ -686,12 +701,13 @@ function processWindow(win) {
 				}
 				let tabs = GroupItems.getOrphanedTabs();
 				if (tabs.length > 0) {
-					tabs.forEach(function(tabitem) log(tabitem.tab.getAttribute("label")));
+					tabs.forEach(function(tabitem) LOG(tabitem.tab.getAttribute("label")));
 				} else {
-					log("No orphaned tabs");
+					LOG("No orphaned tabs");
 				}
 			}}), */
-			$E("menuitem", { label: "Dump tabs without session" }, { command: function() dumpTabsWithoutSession(win) }),
+			// $E("menuitem", { label: "Dump tabs without session" }, { command: function() dumpTabsWithoutSession(win) }),
+			$E("menuitem", { label: "Resort all groups tabs" }, { command: sortAllGroups })
 		]);
 		debugContext.setAttribute("id", PREFIX + "extra-context");
 		parent.appendChild(debugContext);
@@ -701,289 +717,128 @@ function processWindow(win) {
 			parent.removeChild(debugContext);
 		};
 	}
-
-	// CLEANUP ///////////////////////////////////////////////////////////////////////////////////////
-	let windowId = generateID();
-	cleanupList[windowId] = [setupMenu(), setupUiButton(), setupContextMenu()];
 	
-	function onWindowUnload() {
-		delete cleanupList[windowId];
-		delete globalCleanupList[windowId];
-	}
-	win.addEventListener("unload", onWindowUnload, false);
-	globalCleanupList[windowId] = function() {
-		win.removeEventListener("unload", onWindowUnload, false);
-	};
-	// END CLEANUP ///////////////////////////////////////////////////////////////////////////////////
-}
+	unload(setupMenu(), win);
+	unload(setupUiButton(), win);
+	unload(setupContextMenu(), win);
 
-// EXTENSION FUNCTIONS ////////////////////////////////////////////////////////////////////////////
+	/* if (getPref('preventSwitchingGroupOnTabClose')) {
+		let lastGroupBeforeClose = null;
+		let isTabClosed = false;
+
+		// The main problem is probably selectTabOWnerOnClose
+		// If the owner is in different tabgroups, then the group jumping will occur
+		// Simply set selectTabOwnerOnClose to false to prevent tab jumping behavior
+		// Firefox code already uses visibleTabs to determine right/left tab (first it check for right tab and then left tab)
+		
+		// Called just before the tab is closed, so current tab is still the to be closed tab
+		function onTabClose(event) {
+			let aTab = event.target;
+			LOG('[onTabClose] aTab._tabViewTabItem: ' + aTab._tabViewTabItem);
+			if (tabutil.getTabGroupItem(aTab) == tabutil.getTabGroupItem(gBrowser.selectedTab)) {
+				return;
+			}
+			
+			LOG('[onTabClose] closed tab: ' + tabutil.getTitle(aTab));
+
+			let groupItem = tabutil.getTabGroupItem(aTab);
+			let tabItem = groupItem.getActiveTab();
+			if (! tabItem) {
+				tabItem = groupItem.getChild(0);
+			}
+			if (tabItem) {
+				tab = tabItem.tab;
+			}
+
+			LOG('[onTabClose] Selected tab: ' + tabutil.getTitle(tab));
+			gBrowser.selectedTab = tab;
+		} */
+
+		/* function onTabSelect(event) {
+			LOG('[onTabSelect] selected tab: ' + tabutil.getTitle(gBrowser.selectedTab));
+			if (! isTabClosed || ! lastGroupBeforeClose)
+				return;
+
+			LOG('[onTabSelect] after close');
+
+			// not sure whether to change group if this group is empty
+			//if (lastGroupBeforeClose.hidden || lastGroupBeforeClose.isEmpty())
+			//	return;
+			
+			let newGroupItem = getTabItem(gBrowser.selectedTab).parent 
+			if (newGroupItem != lastGroupBeforeClose) {
+				LOG('Current tab group (' + newGroupItem.getTitle() + ') is different with closed tab tabgroup (' + lastGroupBeforeClose.getTitle() + '), switching to old tab group');
+				selectGroup(lastGroupBeforeClose);
+				event.preventDefault();
+				event.stopPropagation();
+			}
+			
+			isTabClosed = false;
+			lastGroupBeforeClose = null;
+		} */
+
+		/* function setupTabCloseHandler() {
+			// gBrowser.tabContainer.addEventListener("TabSelect", onTabSelect, false);
+			gBrowser.tabContainer.addEventListener("TabClose", onTabClose, false);
+			return function() {
+				gBrowser.tabContainer.removeEventListener("TabClose", onTabSelect, false);
+				// gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelect, false);
+			}
+		}
+		
+		unload(setupTabCloseHandler(), win);
+
+		let unlinkedGroupItem = null;
+		function onTabItemClose(tabItem, eventInfo) {
+			unlinkedGroupItem = 
+		}
+	} */
+}
 
 function startup(data, reason) {
-	if (started) return; 
-	started = true;
-
-	// {{
-	log("startup");
-	// }}
-	
-	// Add resource alias
-	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
-  	let alias = Services.io.newFileURI(data.installPath);
-	if (! data.installPath.isDirectory()) {
-		alias = Services.io.newURI("jar:" + alias.spec + "!/", null, null);
-	}
-	resource.setSubstitution("tabgroupsmenu", alias);
-
-	let browserWins = Services.wm.getEnumerator("navigator:browser");
-	
-	while (browserWins.hasMoreElements()) {
-		processWindow(browserWins.getNext());
-	}
-	
-	function windowHandler(subject, topic) {
-		if ("domwindowopened" != topic) return;
-		let winLoad = function() {
-			subject.removeEventListener("load", winLoad, false);
-			if ("navigator:browser" == subject.document.documentElement.getAttribute("windowtype")) {
-				processWindow(subject);	
-			}
-		}
-		subject.addEventListener("load", winLoad, false);
-	}
-	Services.ww.registerNotification(windowHandler);
-	globalCleanupList.ww = function() {
-		Services.ww.unregisterNotification(windowHandler)
-	};
-
-	// Load stylesheet
-	let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
-	let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-	let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
-	styleSheetService.loadAndRegisterSheet(styleUri, styleSheetService.AGENT_SHEET);
-
-	// {{
-	startDebugger();
-	// }}
-}
-
-function shutdown(data, reason) {
-	if (reason == APP_SHUTDOWN) return;
-	
-	if (! started) return;
-	started = false;
-
-	// {{
-	log("shutdown");
-	// }}
-
-  	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
-  	resource.setSubstitution("tabgroupsmenu", null);
-	
-	for each (let funcs in cleanupList) {
-		for ([, f] in Iterator(funcs)) {
-			try { 
-				f(); 
-			} catch (e) {
-				// {{
-				log(e);
-				// }}
-			}
-		}
-	}
-
-	for each (let f in globalCleanupList) {
-		try {
-			f();
-		} catch (e) {
-			// {{
-			log(e);
-			// }}
-		}
-	}
-
-	// Unload stylesheet
-	let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
-	let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-	let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
-	if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET)) {
-		styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
-	}
-
-	// {{
-	stopDebugger();
-	// }}
-}
-
-function install(data, reason) {
-	startup(data, reason); 
-}
-
-function uninstall(data, reason) { 
-	shutdown(data, reason);
-}
-
-// {{
-function startDebugger() {
-	let jsd = Cc["@mozilla.org/js/jsd/debugger-service;1"].getService(Ci.jsdIDebuggerService);  
-	if (! jsd.isOn) {
-		jsd.asyncOn({ 
-			onDebuggerActivated: function() {
-				jsd.errorHook = {  
-					onError: function(message, fileName, lineNo, colNo, flags, errnum, exc) {  
-						log(message + "@" + fileName + "@" + lineNo + "@" + colNo + "@" + errnum + "\n");  
-								  
-						// check message type  
-						var jsdIErrorHook = Components.interfaces.jsdIErrorHook;  
-						var messageType;          
-						if (flags & jsdIErrorHook.REPORT_ERROR)  
-							messageType = "Error";  
-						if (flags & jsdIErrorHook.REPORT_WARNING)  
-							messageType = "Warning";  
-						if (flags & jsdIErrorHook.REPORT_EXCEPTION)  
-							messageType = "Uncaught-Exception";  
-						if (flags & jsdIErrorHook.REPORT_STRICT)  
-							messageType += "-Strict";  
-				  
-						// log("errorHook: " + messageType + "\n");  
-				  
-						return true;   // trigger debugHook  
-						// return true; if you do not wish to trigger debugHook  
-					}  
-				};
-				jsd.debugHook = {  
-					onExecute: function(frame, type, rv) {  
-						stackTrace = "";  
-						for (var f = frame; f; f = f.callingFrame) {  
-							stackTrace += f.script.fileName + "@" + f.line + "@" + f.functionName + "\n";  
-						}  
-						log("debugHook: " + stackTrace);
-				  
-						return Components.interfaces.jsdIExecutionHook.RETURN_CONTINUE;  
-					}  
-				};
-			}
-		});
-	}
-}
-
-function stopDebugger() {
-	let jsd = Cc["@mozilla.org/js/jsd/debugger-service;1"].getService(Ci.jsdIDebuggerService);  
-	if (jsd.isOn) {
-		jsd.off();
-		jsd.errorHook = null;
-		jsd.debugHook = null;
-	}
-}
-
-function dumpSession(window) {
-	let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-
-	window.document.addEventListener("SSTabRestoring", function(event) {
-		let tab = event.target;
-		let strTab = ss.getTabValue(tab, "tabview-tab");
-		if (strTab != "") {
-			let data = JSON.parse(strTab);
-			log("tab -> " + data.groupID);
-		}
-	}, false);
-}
-
-// }}
-
-function dumpVisibleTabs(win) {
-	let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-	let groups = JSON.parse(ss.getWindowValue(win, "tabview-group"));
-	for each(tab in win.gBrowser.visibleTabs) {
-		let str = ss.getTabValue(tab, "tabview-tab");
-		let group = "???";
-		if (str != "") {
-			let data = JSON.parse(str);
-			if (data) {
-				group = groups[data.groupID].title;
-			}
-		}
-		log(group + " - " + tab.getAttribute("label"));
-	}
-}
-
-function dumpWindow(win) {
-	let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-	log("window sessionstore: " + ss.getWindowValue(win, "tabview-group"));
-}
-
-function dumpTabsWithoutSession(win) {
-	let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
-	for (let i = 0, n = win.gBrowser.tabs.length; i < n; i++) {
-		let tab = win.gBrowser.tabs[i];
-		if (tab.pinned) {
-			continue;
-		}
-		if (! getTabItem(tab)) {
-			log("No tabitem: " + tab.getAttribute("label"));
-		} else {
-			let str = ss.getTabValue(tab, "tabview-tab");
-			if (str === undefined || str == "") {
-				log("No sessionstore: " + tab.getAttribute("label"));
-			} else {
-				let data = JSON.parse(str);
-				if (data === null) {
-					log("Session data is null: " + tab.getAttribute("label"));
-				}
-			}
-		}
-	}
-}
-
-// Not all tabs have associated tabview-tab sessionstore data. These tabs get attached to the last selected tab on restore.
-// Here we iterate through all tabs and set sessionstore data for tabs which do not have it.
-function fixTabsSessionStore(win, GroupItems) {
-	if (! GroupItems) {
-		win.alert("Click the menu first to load panorama");
-		return;
-	}
-
-	let title = "Tabs with no session data";
-	let group = null;
-	for (let i = 0, n = GroupItems.groupItems.length; i < n; i++) {
-		if (GroupItems.groupItems[i].getTitle() == title) {
-			group = GroupItems.groupItems[i];
-			break;
-		}
-	}
-	if (group === null) {
-		let GroupItem = win.TabView.getContentWindow().GroupItem;
-		group = new GroupItem(null, { title: title, immediately: true, bounds: { left: 10, top: 10, width: 50, height: 50 } });
-	}
-
-	let TabItem = win.TabView.getContentWindow().TabItem;
-	
-	
-	for (let i = 0, n = win.gBrowser.tabs.length; i < n; i++) {
-		let tab = win.gBrowser.tabs[i];
-		if (! getTabItem(tab)) {
-			continue;
-		}
-		let loose = false;
+	AddonManager.getAddonByID(data.id, function(addon) {
+		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/moz-utils.js").spec, global);
+		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/my-utils.js").spec, global);
+		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/tab.js").spec, global);
+		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/debug.js").spec, global);
+		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/prefs.js").spec, global);
 		
-		let str = ss.getTabValue(tab, "tabview-tab");
-		if (str === undefined || str == "") {
-			loose = true;
-		} else {
-			let data = JSON.parse(str);
-			if (data === null) {
-				loose = true;
-			}
-		}
+		LOG("startup");
+		
+		startDebugger();
+		unload(stopDebugger);
 
-		if (loose) {
-			log("Fix: " + tab.getAttribute("label"));
-			// Load tab if not loaded
-			if (tab.getAttribute("ontap") === true) {
-				BarTap.loadTabContents(tab);
-			}
-			GroupItems.moveTabToGroupItem(tab, group.id);
-			getTabItem(tab).save();
+		setDefaultPrefs();
+
+		// Set resource substitution
+		let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
+		let alias = Services.io.newFileURI(data.installPath);
+		if (! data.installPath.isDirectory()) {
+			alias = Services.io.newURI("jar:" + alias.spec + "!/", null, null);
 		}
-	}
+		resource.setSubstitution("tabgroupsmenu", alias);
+		unload(function() resource.setSubstitution("tabgroupsmenu", null));
+ 
+		// Load stylesheet
+		let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
+		let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+		let styleUri = ioService.newURI("resource://tabgroupsmenu/style.css", null, null);
+		styleSheetService.loadAndRegisterSheet(styleUri, styleSheetService.AGENT_SHEET);
+		unload(function() {
+			if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET))
+				styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
+		});
+		
+		watchWindows(processWindow);
+	});
 }
+	
+function shutdown(data, reason) {
+	if (reason != APP_SHUTDOWN)
+		unload();
+}
+
+function install() {}
+function uninstall() {}
+
+// vim: set ts=4 sw=4 sts=4 et:
