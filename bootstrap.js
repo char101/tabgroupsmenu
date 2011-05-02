@@ -462,12 +462,6 @@ function processWindow(win) {
 		while (popup.firstChild) {
 			popup.removeChild(popup.firstChild);
 		}
-
-		let mi = $E("menuitem", { label: "New Group\u2026", "class": "menu-iconic" });
-		mi.addEventListener("command", createGroup, false);
-		popup.appendChild(mi);
-	
-		popup.appendChild($E("menuseparator"));
 		
 		// Lisf of tab groups
 		let hasGroups = false;
@@ -550,6 +544,12 @@ function processWindow(win) {
 				popup.appendChild(mi);
 			});
 		}
+
+        popup.appendChild($E("menuseparator"));
+		
+        let mi = $E("menuitem", { label: "New Group\u2026", "class": "menu-iconic" });
+		mi.addEventListener("command", createGroup, false);
+		popup.appendChild(mi);
 	}
 	
 	function setupMenu() {
