@@ -587,21 +587,28 @@ function processWindow(win) {
 		let tabviewButton = doc.getElementById("tabview-button");
 		let btnPopup = null;
 		if (tabviewButton) {
-			tabviewButton.setAttribute("type", "menu-button");
-			
-			// Embed tabgroups menu under this button
-			btnPopup = $E("menupopup", { 
-				id: MENUBTN + "-popup",
-				class: POPUP_CLASS // this must be addes so that css rules above works
-			});
-			set_type(btnPopup, TYPE_MAIN_POPUP);
-			btnPopup.addEventListener("popupshowing", showTabsMenuProxy, false);
-			// Prevent firefox toolbar context menu
-			btnPopup.addEventListener("context", (function(event) {
-				event.preventDefault();
-				event.stopPropagation();
-			}), false);
-			tabviewButton.appendChild(btnPopup);
+            // Embed tabgroups menu under this button
+            let btnPopup = $E("menupopup", { 
+                id: MENUBTN + "-popup",
+                class: POPUP_CLASS // this must be addes so that css rules above works
+            });
+            set_type(btnPopup, TYPE_MAIN_POPUP);
+            btnPopup.addEventListener("popupshowing", showTabsMenuProxy, false);
+            // Prevent firefox toolbar context menu
+            btnPopup.addEventListener("context", (function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }), false);
+            tabviewButton.setAttribute("type", "menu-button");    
+            tabviewButton.appendChild(btnPopup);
+            
+            if (getPref('replacePanoramaButton')) {
+                tabviewButton.addEventListener("click", function(event) {
+                    btnPopup.openPopup(tabviewButton, "after_start", 0, 0, false, false);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }, true);
+            }
 		}
 
 		return function() {
