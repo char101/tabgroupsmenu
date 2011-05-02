@@ -187,7 +187,6 @@ function processWindow(win) {
 		}
 		if (tabItem) {
             gBrowser.selectedTab = tabItem.tab;
-			//GroupItems.updateActiveGroupItemAndTabBar(tabItem);
 			closeMenu();
 		} else {
 			GroupItems.setActiveGroupItem(groupItem);
