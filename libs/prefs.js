@@ -38,7 +38,8 @@
 const PREF_BRANCH = "extensions.tabgroupsmenu.";
 const PREFS = {
   openOnMouseOver: false,
-  replacePanoramaButton: false
+  replacePanoramaButton: false,
+  useMenuButtonForPanoramaReplacement: true
 };
 
 /**

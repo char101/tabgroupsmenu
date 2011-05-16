@@ -598,7 +598,7 @@ function processWindow(win) {
                 event.preventDefault();
                 event.stopPropagation();
             }), false);
-            tabviewButton.setAttribute("type", "menu-button");    
+            if (getPref('useMenuButtonForPanoramaReplacement')) tabviewButton.setAttribute("type", "menu-button");    
             tabviewButton.appendChild(btnPopup);
             
             if (getPref('replacePanoramaButton')) {
