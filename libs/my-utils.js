@@ -239,6 +239,10 @@ function createWindowFuncs(window) {
         promptService.alert(window, title, text);
     };
 
+    obj.confirm = function WU_confirm(title, text) {
+        return promptService.confirm(window, title, text);        
+    };
+
     return obj;
 }
 

@@ -113,7 +113,7 @@ function processWindow(window) {
 		let group = GU.findGroup(menu.value);
 		
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
-		if (window.confirm("Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
+		if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
 			GU.closeGroup(group);
 		}
 
@@ -132,7 +132,7 @@ function processWindow(window) {
 			if (newname && newname != oldname) {
 				let fullname = parts.length > 0 ? parts.join(GROUP_SEPARATOR) + GROUP_SEPARATOR + newname : newname;
 				if (GroupItems.groupItems.some(function(group) group.getTitle() == fullname)) {
-					window.alert("Group with title \"" + newname + "\" already exists.");
+					WU.alert("Failed to rename group", "Group with title \"" + newname + "\" already exists.");
 					return;
 				}
 				GU.renameGroup(group, newname);
