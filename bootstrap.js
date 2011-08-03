@@ -265,22 +265,23 @@ function processWindow(window) {
 
 	function onTabDragOver(event) {
 		let target = event.target;
+		
+		let value = parseInt(event.dataTransfer.mozGetDataAt("plain/text", 0), 10);
+		let type = event.dataTransfer.mozGetDataAt("plain/text", 1);
 
 		// drag to group
 		if (target.tagName != "menu") {
 			event.stopPropagation(); 
 			return;
 		}
-
-		if (! (target.hasAttribute(ATTR_TYPE) && target.getAttribute(ATTR_TYPE) == TYPE_GROUP)) {
+		
+		if (! ((type == "menu" && target.id == MENUID) ||
+			   target.getAttribute(ATTR_TYPE) == TYPE_GROUP)) {
 			event.stopPropagation();
 			return;
-		}
+		}		
 		
-		let value = parseInt(event.dataTransfer.mozGetDataAt("plain/text", 0), 10);
-		let type = event.dataTransfer.mozGetDataAt("plain/text", 1);
-		
-		let group = GU.findGroup(target.value);
+		let group = target.value ? GU.findGroup(target.value) : null;
 		if (type == "menuitem") {
 			let tab = gBrowser.tabs[value];
 			if (tab) {
@@ -295,7 +296,7 @@ function processWindow(window) {
 			parts.pop();
 			let sourcePrefix = parts.join(GROUP_SEPARATOR);
 			// Can't drag to the same group, its children, or its immediate parent
-			if (sourceGroup == group || group.getTitle().indexOf(sourceGroup.getTitle() + GROUP_SEPARATOR) === 0 || (sourcePrefix && group.getTitle() == sourcePrefix)) {
+			if ((! sourcePrefix && target.id == MENUID) || sourceGroup == group || (group && group.getTitle().indexOf(sourceGroup.getTitle() + GROUP_SEPARATOR) === 0) || (sourcePrefix && group && group.getTitle() == sourcePrefix)) {
 				event.stopPropagation();
 				return;
 			}
@@ -311,7 +312,10 @@ function processWindow(window) {
 		let value = dt.mozGetDataAt("plain/text", 0);
 		let type = dt.mozGetDataAt("plain/text", 1);
 
-		let dstGroup = GU.findGroup(event.target.value);
+		let dstGroup = null; // if null then move to top
+		if (event.target.id != MENUID) {
+			dstGroup = GU.findGroup(event.target.value);
+		}
 
 		if (type == "menuitem") {
 			let tab = gBrowser.tabs[tabindex];
@@ -578,6 +582,10 @@ function processWindow(window) {
 			accesskey: "G",
 			context: PREFIX + "extra-context"
 		});
+		// enable drop
+		tabsMenu.addEventListener("dragenter", onTabDragEnter, false);
+		tabsMenu.addEventListener("dragover", onTabDragOver, false);
+		tabsMenu.addEventListener("drop", onTabDrop, false);
 		if (getPref('openOnMouseOver')) {
 			tabsMenu.addEventListener("mouseover", function(event) this.open = true, true);
 			tabsMenu.addEventListener("click", function(event) this.open = true, true);

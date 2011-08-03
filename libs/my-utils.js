@@ -155,10 +155,26 @@ function createGroupFuncs(window) {
 
     obj.moveGroup = function GU_moveGroup(srcGroup, dstGroup) {
         // move srcgroup under dstgroup
-        let dstTitle = dstGroup.getTitle();
         let srcTitle = srcGroup.getTitle();
-        let newName = obj.joinTitle(dstTitle, obj.splitTitle(srcTitle).name);
-        srcGroup.setTitle(newName);
+        let newName;
+        if (dstGroup) {
+            let dstTitle = dstGroup.getTitle();
+            newName = obj.joinTitle(dstTitle, obj.splitTitle(srcTitle).name);
+        } else {
+            // move to top
+            newName = obj.splitTitle(srcTitle).name;
+        }
+        let existingGroup = obj.findGroup(newName);
+        if (existingGroup) {
+            // Move tabs from srcGroup to existingGroup
+            srcGroup.getChildren().forEach(function(tabitem) {
+                GroupItems.moveTabToGroupItem(tabitem.tab, existingGroup.id);
+            });
+            srcGroup.destroy();
+            srcGroup = existingGroup;
+        } else {
+            srcGroup.setTitle(newName);
+        }
 
         // move children of srcgroup under the new srcgroup
         let oldPrefix = srcTitle + GROUP_SEPARATOR;
