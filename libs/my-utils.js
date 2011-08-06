@@ -71,10 +71,14 @@ function createGeneralFuncs(win) {
  */
 function createGroupFuncs(window) {
     let {document, gBrowser} = window;
-    let GroupItems = window.TabView.getContentWindow().GroupItems;
-    let obj = {};
+    let GroupItems = window.TabView.getContentWindow() == null ? null : window.TabView.getContentWindow().GroupItems;
+    let GU = {};
+   
+    GU.onPanoramaLoaded = function GU_onPanoramaLoaded() {
+        GroupItems = window.TabView.getContentWindow().GroupItems;
+    };
     
-    obj.findGroup = function GU_findGroup(spec) {
+    GU.findGroup = function GU_findGroup(spec) {
         let group = null;
         if (typeof(spec) === "number") {
             return GroupItems.groupItem(spec);
@@ -89,7 +93,7 @@ function createGroupFuncs(window) {
         return group;
     };
 
-    obj.getFormattedTitle = function GU_getFormattedTitle(group, prefix) {
+    GU.getFormattedTitle = function GU_getFormattedTitle(group, prefix) {
         let title = group.getTitle();
         if (! title) {
             title = group.id;
@@ -100,32 +104,38 @@ function createGroupFuncs(window) {
         let nSubGroups = 0, nTabs = group.getChildren().length;
         let prefix = title + GROUP_SEPARATOR;
         GroupItems.groupItems.forEach(function(gr) {
-            if (gr.getTitle().indexOf(prefix) == 0) {
+            if (GU.isChild(gr, group)) {
                 ++nSubGroups;
                 nTabs += gr.getChildren().length;
             }
         });
         if (nTabs || nSubGroups) {
-            if (nTabs) 
-                title += " (" + nTabs + " tab" + (nTabs > 1 ? "s" : "");
+            title += " (";
+            if (nTabs) {
+                title += nTabs + " tab" + (nTabs > 1 ? "s" : "");
+                if (nSubGroups)
+                    title += ", ";
+            }
             if (nSubGroups) 
-                title += ", " + nSubGroups + " group" + (nSubGroups > 1 ? "s" : "");
+                title += nSubGroups + " group" + (nSubGroups > 1 ? "s" : "");
             title += ")";
         }
         return title;
     };
 
-    obj.createGroup = function GU_createGroup(name, prefix) {
+    GU.createGroup = function GU_createGroup(name, prefix, openInBg) {
         let newGroup = GroupItems.newGroup();
-        newGroup.setTitle(obj.joinTitle(prefix, name));
-        newGroup.newTab();
-        let newitem = newGroup.getChild(0);
-        gBrowser.selectedTab = newitem.tab;
+        newGroup.setTitle(GU.joinTitle(prefix, name));
+        if (! openInBg) {
+            newGroup.newTab();
+            let newitem = newGroup.getChild(0);
+            gBrowser.selectedTab = newitem.tab;
+        }
         return newGroup;
     };
 
-    obj.createIfNotExists = function GU_createIfNotExists(title) {
-        let group = obj.findGroup(title);
+    GU.createIfNotExists = function GU_createIfNotExists(title) {
+        let group = GU.findGroup(title);
         if (! group) {
             group = GroupItems.newGroup();
             group.setTitle(title);
@@ -133,15 +143,15 @@ function createGroupFuncs(window) {
         return group;
     };
 
-    obj.createTabInGroup = function GU_createTabInGroup(group) {
+    GU.createTabInGroup = function GU_createTabInGroup(group) {
 		GroupItems.setActiveGroupItem(group);
 		gBrowser.loadOneTab("about:blank", { inBackground: false });
     };
 
-    obj.renameGroup = function GU_renameGroup(group, newname) {
+    GU.renameGroup = function GU_renameGroup(group, newname) {
         let title = group.getTitle();
         
-        let newtitle = obj.joinTitle(obj.splitTitle(title).prefix, newname);
+        let newtitle = GU.joinTitle(GU.splitTitle(title).prefix, newname);
         group.setTitle(newtitle);
         
         let prefix = title + GROUP_SEPARATOR;
@@ -153,18 +163,18 @@ function createGroupFuncs(window) {
         });
     };
 
-    obj.moveGroup = function GU_moveGroup(srcGroup, dstGroup) {
+    GU.moveGroup = function GU_moveGroup(srcGroup, dstGroup) {
         // move srcgroup under dstgroup
         let srcTitle = srcGroup.getTitle();
         let newName;
         if (dstGroup) {
             let dstTitle = dstGroup.getTitle();
-            newName = obj.joinTitle(dstTitle, obj.splitTitle(srcTitle).name);
+            newName = GU.joinTitle(dstTitle, GU.splitTitle(srcTitle).name);
         } else {
             // move to top
-            newName = obj.splitTitle(srcTitle).name;
+            newName = GU.splitTitle(srcTitle).name;
         }
-        let existingGroup = obj.findGroup(newName);
+        let existingGroup = GU.findGroup(newName);
         if (existingGroup) {
             // Move tabs from srcGroup to existingGroup
             srcGroup.getChildren().forEach(function(tabitem) {
@@ -182,23 +192,23 @@ function createGroupFuncs(window) {
         GroupItems.groupItems.forEach(function(gr) {
             let title = gr.getTitle();
             if (title.indexOf(oldPrefix) === 0) {
-                gr.setTitle(obj.joinTitle(newPrefix, obj.splitTitle(title).name));
+                gr.setTitle(GU.joinTitle(newPrefix, GU.splitTitle(title).name));
             }
         });
     };
 
-    obj.closeGroup = function GU_closeGroup(group) {
+    GU.closeGroup = function GU_closeGroup(group) {
         // Close children
         GroupItems.groupItems.forEach(function(gr) {
-            if (obj.isChild(gr, group)) {
-                obj.closeGroup(gr);
+            if (GU.isChild(gr, group)) {
+                GU.closeGroup(gr);
             }
         });
         group.destroy();
     };
 
     // Extract display name without prefix
-    obj.splitTitle = function GU_splitTitle(title) {
+    GU.splitTitle = function GU_splitTitle(title) {
         let parts = title.split(GROUP_SEPARATOR);
         let name = parts.pop();
         return {
@@ -207,27 +217,49 @@ function createGroupFuncs(window) {
         };
     };
 
-    obj.joinTitle = function GU_joinTitle(prefix, name) {
+    GU.joinTitle = function GU_joinTitle(prefix, name) {
         return prefix ? (prefix + GROUP_SEPARATOR + name) : name;
     };
 
-    obj.isChild = function GU_isChild(childGroup, parentGroup) {
+    GU.isChild = function GU_isChild(childGroup, parentGroup) {
         return childGroup.getTitle().indexOf(parentGroup.getTitle() + GROUP_SEPARATOR) === 0;
     };
 
-    return obj;
+    GU.hasSubgroup = function GU_hasSubgroup(group) {
+        let title = group.getTitle();
+        if (! title)
+            return false;
+        let prefix = title + GROUP_SEPARATOR;
+        return GroupItems.groupItems.some(function(gr) gr.getTitle().indexOf(prefix) === 0);
+    };
+
+    GU.getNumberOfGroups = function GU_getNumberOfGroups() {
+        let el = document.getElementById("tabviewGroupsNumber");
+        if (el) {
+            return el.getAttribute("groups");
+        }
+    };
+
+    GU.getNumberOfTabsInActiveGroup = function GU_getNumberOfTabsInActiveGroup() {
+        let group = GroupItems.getActiveGroupItem();
+        if (group) {
+            return group.getChildren().length;
+        }
+    };
+
+    return GU;
 }
 
 function createWindowFuncs(window) {
     let {gBrowser} = window;
-    let obj = {}
+    let WU = {}
     let promptService = Cc["@mozilla.org/embedcomp/prompt-service;1"].getService(Ci.nsIPromptService);
 
-    obj.selectTab = function WU_selectTab(tabIndex) {
+    WU.selectTab = function WU_selectTab(tabIndex) {
         gBrowser.tabContainer.selectedIndex = tabIndex;
     };
 
-    obj.prompt = function WU_prompt(title, text, value) {
+    WU.prompt = function WU_prompt(title, text, value) {
         let input = { value: value };
         let check = { value: false };
         if (promptService.prompt(window, title, text, input, null, check)) {
@@ -235,15 +267,76 @@ function createWindowFuncs(window) {
         }
     };
 
-    obj.alert = function WU_alert(title, text) {
+    WU.alert = function WU_alert(title, text) {
         promptService.alert(window, title, text);
     };
 
-    obj.confirm = function WU_confirm(title, text) {
+    WU.confirm = function WU_confirm(title, text) {
         return promptService.confirm(window, title, text);        
     };
 
-    return obj;
+    WU.confirmCheck = function WU_confirmCheck(title, text, checkmsg) {
+        let checkstate = { value: false };
+        let ret = promptService.confirm(window, title, text, checkmsg, checkstate);
+        return [ret, checkstate.value];
+    };
+
+    WU.promptCheck = function WU_promptCheck(title, text, val, checkmsg) {
+        let value = { value: val };
+        let check = { value: false };
+        let ret = promptService.prompt(window, title, text, value, checkmsg, check);
+        return [ret, value.value, check.value];
+    }
+
+    WU.getNumberOfTabs = function GU_getNUmberOfTabs() {
+        return gBrowser.tabs.length;  
+    };
+
+    return WU;
+}
+
+function createUIFuncs(window) {
+    let {document} = window;
+    let UI = {};
+    
+    /**
+     * Mark panorama loading in given element
+     */
+    UI.markLoading = function UI_markLoading() {
+        let menu = document.getElementById(GROUPS_MENU_ID);
+        if (menu) {
+            menu.setAttribute("class", "menu-iconic");
+            menu.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
+        }
+        let btn = document.getElementById(TABVIEW_BUTTON_ID);
+        if (btn) {
+            btn.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
+        }
+    };
+
+    UI.unmarkLoading = function UI_unmarkLoading() {
+        let menu = document.getElementById(GROUPS_MENU_ID);
+        if (menu) {
+            menu.setAttribute("class", "");
+            menu.removeAttribute("image");
+        }
+        let btn = document.getElementById(TABVIEW_BUTTON_ID);
+        if (btn) {
+            btn.removeAttribute("image");
+        }
+    };
+
+    UI.openPopup = function UI_openPopup(popup) {
+        if (popup.id == GROUPS_POPUP_ID) {
+            document.getElementById(GROUPS_MENU_ID).open = false;
+            document.getElementById(GROUPS_MENU_ID).open = true;
+        } else {
+            popup.hidePopup();
+            popup.openPopup(document.getElementById(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
+        }
+    };
+
+    return UI;
 }
 
 // vim: set ts=4 sw=4 sts=4 et:

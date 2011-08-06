@@ -38,9 +38,13 @@
 const PREF_BRANCH = "extensions.tabgroupsmenu.";
 const PREFS = {
   openOnMouseOver: false,
+  addButtonMenu: true,
   replacePanoramaButton: false,
   showTabsMenu: true,
-  useCurrentGroupNameInTabsMenu: false
+  useCurrentGroupNameInTabsMenu: false,
+  showTabCount: true,
+  showGroupCount: true,
+  newPrefs: ""
 };
 
 /**
@@ -61,6 +65,18 @@ function getPref(key) {
       return getPref.branch.getCharPref(key);
   }
   return null;
+}
+
+function setPref(key, value) {
+	let branch = Services.prefs.getBranch(PREF_BRANCH);
+	switch (typeof PREFS[key]) {
+		case "boolean":
+			return getPref.branch.setBoolPref(key, value);
+		case "number":
+			return getPref.branch.setIntPref(key, value);
+		case "string":
+			return getPref.branch.setCharPref(key, value);
+	}
 }
 
 /**

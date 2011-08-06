@@ -6,13 +6,25 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AddonManager.jsm");
 
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+const EXT_ID = "tabgroupsmenu@char.cc";
 const global = this;
 
 const PREFIX = "grouptabs-";
-const MENUID = PREFIX + "menu";
-const MENUBTN = PREFIX + "btn";
-const CURRENT_GROUP_MENU_ID = PREFIX + "cgm";
-const CURRENT_GROUP_POPUP_ID = PREFIX + "cgp";
+
+const GROUPS_MENU_ID = PREFIX + "menu";
+const GROUPS_POPUP_ID = PREFIX + "menu-popup";
+const GROUPS_MENU_LABEL = "TabGroups";
+
+const TABS_MENU_ID = PREFIX + "cgm";
+const TABS_POPUP_ID = PREFIX + "cgp";
+
+const GROUPS_BTN_ID = PREFIX + "btn";
+const GROUPS_BTNPOPUP_ID = PREFIX + "btn-popup";
+
+const BUTTON_MENU_ID = PREFIX + "btn-menu";
+const BUTTON_POPUP_ID = PREFIX + "btn-popup";
+
+const TABVIEW_BUTTON_ID = "tabview-button";
 
 const ATTR_TYPE = PREFIX + "type"
 const TYPE_GROUP = "group";
@@ -22,33 +34,26 @@ const TYPE_MAIN_POPUP = "main-popup";
 
 const POPUP_CLASS = PREFIX + "popup";
 
-const GROUP_SEPARATOR = " |:| ";
-
-function initWindow(window) {
-	if (window.TabView.getContentWindow() == null) {
-		window.TabView._initFrame(function() processWindow(window));
-	} else {
-		processWindow(window);
-	}
-}
+const GROUP_SEPARATOR = " ~> ";
 
 function processWindow(window) {
 	let {document, gBrowser} = window;
-	let GroupItems = window.TabView.getContentWindow().GroupItems;
+	let GroupItems = window.TabView.getContentWindow() == null ? null : window.TabView.getContentWindow().GroupItems;
 	let gTabView = gBrowser.TabView;
 	let deleteList = [];
 
 	let {$, $E, $EL} = createGeneralFuncs(window);
 
 	// Check if window already processed
-	if ($(MENUID))
+	if ($(GROUPS_MENU_ID))
 		return;
 	
 	let GU = createGroupFuncs(window);
 	let WU = createWindowFuncs(window);
+	let UI = createUIFuncs(window);
 
 	function currentPopup() {
-		return $( ($(MENUID).open ? MENUID : MENUBTN) + "-popup"  );
+		return $( $(GROUPS_MENU_ID).open ? GROUPS_POPUP_ID : GROUPS_BTNPOPUP_ID );
 	}
 
 	function closeMenu() {
@@ -72,15 +77,15 @@ function processWindow(window) {
 	}
 	
 	function onCreateGroup(event) {
-		let name = WU.prompt("Create New Group", "Enter group title:");
-		if (name) {
+		let [ret, name, openInBg] = WU.promptCheck("Create New Group", "Enter group title:", "", "Open in background");
+		if (ret && name != null && name.length) {
 			name = name.trim();
 			if (name) {
 				if (GU.findGroup(name)) {
 					WU.alert("Cannot create group", 'Group "' + name + '" already exists');
 					return;
 				}
-				GU.createGroup(name);
+				GU.createGroup(name, null, openInBg);
 			}
 		}
 	}
@@ -88,8 +93,8 @@ function processWindow(window) {
 	function onCreateSubGroup(event) {
 		let group = GU.findGroup(document.popupNode.value);
 		let title = group.getTitle();
-		let name = WU.prompt("Create Subgroup of " + title, "Enter group title:");
-		if (name) {
+		let [ret, name, openInBg] = WU.promptCheck("Create Subgroup of " + title, "Enter group title:", "", "Open in background");
+		if (ret && name != null && name.length) {
 			name = name.trim();
 			if (name) {
 				let pathTitle = GU.joinTitle(title, name);
@@ -97,7 +102,7 @@ function processWindow(window) {
 					WU.alert("Cannot create group", 'Group "' + name + '" already exists as child of "' + title + '"');
 					return;
 				}
-				GU.createGroup(name, title);
+				GU.createGroup(name, title, openInBg);
 			}
 		}
 	}
@@ -117,8 +122,8 @@ function processWindow(window) {
 			GU.closeGroup(group);
 		}
 
-		// there is no use refreshing the menu here since tab switching remove the focus
-		closeMenu();
+		// Reopen menu
+		UI.openPopup(document.popupNode.parentNode);
 	}
 
 	function onRenameGroup(event) {
@@ -138,6 +143,8 @@ function processWindow(window) {
 				GU.renameGroup(group, newname);
 			}
 		}
+		// Reopen menu
+		UI.openPopup(document.popupNode.parentNode);
 	}
 
 	function selectGroupEventHandler(event) {
@@ -208,7 +215,7 @@ function processWindow(window) {
 			popup.removeChild(event.target);
 			// refresh label
 			let id = popup.getAttribute("id");
-			if (id != (MENUID + "-popup") && id != (MENUBTN + "-popup")) {
+			if (id != GROUPS_POPUP_ID && id != GROUPS_BTNPOPUP_ID) {
 				let menu = popup.parentNode;
 				let title = menu.getAttribute("label");
 				menu.setAttribute("label", title.replace(/^(.*) \((\d+)\)$/, function(str, label, count) { return label + " (" + (parseInt(count, 10) - 1) + ")"; }));
@@ -226,12 +233,82 @@ function processWindow(window) {
 		}
 	}
 
+	function getGroupsMenuLabel(isTabClose) {
+		isTabClose = isTabClose || false;
+		
+		let title = GROUPS_MENU_LABEL;
+		if (GroupItems) {
+			if (getPref("showGroupCount") || getPref("showTabCount")) {
+				title += " (";
+				if (getPref("showTabCount")) {
+					let tabCount = WU.getNumberOfTabs();
+					if (tabCount == null || tabCount == undefined) {
+						tabCount = "-";
+					} else if (isTabClose)
+						tabCount--; // this event is triggered before the tab is removed
+					title += tabCount;
+					if (getPref("showGroupCount")) {
+						title += "/";
+					}
+				}
+				if (getPref("showGroupCount")) {
+					let groupCount = GU.getNumberOfGroups();
+					if (groupCount == null && groupCount == undefined) {
+						groupCount = "-";
+					}
+					title += groupCount;
+				}
+				title += ")";
+			}
+		}
+		return title;
+	}
+	
+	function getTabsMenuLabel() {
+		let title = "Tabs";
+		if (GroupItems) {
+			if (getPref("useCurrentGroupNameInTabsMenu")) {
+				let group = GroupItems.getActiveGroupItem();
+				if (group) {
+					title = group.getTitle();
+				}
+			}
+			if (getPref("showTabCount")) {
+				let tabCount = GU.getNumberOfTabsInActiveGroup();
+				if (tabCount) {
+					title += " (" + tabCount + ")";
+				}
+			}
+		}
+		return title;
+	}
+
 	// Called when switching tab
 	function onTabSelectHandler(event) {
-		let group = GroupItems.getActiveGroupItem();
-		if (group) {
-			$(CURRENT_GROUP_MENU_ID).setAttribute("label", group.getTitle());
+		if (getPref("useCurrentGroupNameInTabsMenu")) {
+			$(TABS_MENU_ID).setAttribute("label", getTabsMenuLabel());
 		}
+	}
+
+	function updateMenuLabels(isTabClose) {
+		if (getPref("showTabCount") || getPref("showGroupCount")) {
+			$(GROUPS_MENU_ID).setAttribute("label", getGroupsMenuLabel(isTabClose));
+		}
+		if (getPref("showTabCount")) {
+			$(TABS_MENU_ID).setAttribute("label", getTabsMenuLabel());
+		}
+	}
+
+	function onTabOpenHandler(event) {
+		updateMenuLabels();
+	}
+
+	function onTabCloseHandler(event) {
+		updateMenuLabels(true);
+	}
+
+	function onTabMoveHandler(event) {
+		updateMenuLabels();
 	}
 
 	// DRAG DROP //////////////////////////////////////////////////////////////////////////////////////
@@ -275,7 +352,7 @@ function processWindow(window) {
 			return;
 		}
 		
-		if (! ((type == "menu" && target.id == MENUID) ||
+		if (! ((type == "menu" && target.id == GROUPS_MENU_ID) ||
 			   target.getAttribute(ATTR_TYPE) == TYPE_GROUP)) {
 			event.stopPropagation();
 			return;
@@ -291,12 +368,20 @@ function processWindow(window) {
 				}
 			}
 		} else if (type == "menu") {
-			let sourceGroup = GU.findGroup(value);
-			let parts = sourceGroup.getTitle().split(GROUP_SEPARATOR);
-			parts.pop();
-			let sourcePrefix = parts.join(GROUP_SEPARATOR);
-			// Can't drag to the same group, its children, or its immediate parent
-			if ((! sourcePrefix && target.id == MENUID) || sourceGroup == group || (group && group.getTitle().indexOf(sourceGroup.getTitle() + GROUP_SEPARATOR) === 0) || (sourcePrefix && group && group.getTitle() == sourcePrefix)) {
+			let canDrop = true;
+			if (group && ! group.getTitle()) {
+				canDrop = false;
+			} else {
+				let sourceGroup = GU.findGroup(value);
+				let parts = sourceGroup.getTitle().split(GROUP_SEPARATOR);
+				parts.pop();
+				let sourcePrefix = parts.join(GROUP_SEPARATOR);
+				// Can't drag to the same group, its children, or its immediate parent
+				if ((! sourcePrefix && target.id == GROUPS_MENU_ID) || sourceGroup == group || (group && group.getTitle().indexOf(sourceGroup.getTitle() + GROUP_SEPARATOR) === 0) || (sourcePrefix && group && group.getTitle() == sourcePrefix)) {
+					canDrop = false;
+				}
+			}
+			if (! canDrop) {
 				event.stopPropagation();
 				return;
 			}
@@ -306,18 +391,19 @@ function processWindow(window) {
 		event.stopPropagation();
 	}
 
-	function onTabDrop(event) {
+	function onTabDrop(event) {		
 		let dt = event.dataTransfer;
 		
 		let value = dt.mozGetDataAt("plain/text", 0);
 		let type = dt.mozGetDataAt("plain/text", 1);
 
 		let dstGroup = null; // if null then move to top
-		if (event.target.id != MENUID) {
+		if (event.target.id != GROUPS_MENU_ID) {
 			dstGroup = GU.findGroup(event.target.value);
 		}
 
 		if (type == "menuitem") {
+			let tabindex = value;
 			let tab = gBrowser.tabs[tabindex];
 			let tabitem = getTabItem(tab);
 			if (tabitem && tabitem.parent) {
@@ -363,22 +449,105 @@ function processWindow(window) {
 		}
 
 		// Updating menu works but the drop target styles doesn't seems cleared
-		closeMenu();
+		// closeMenu();
+
+		// Reopen menu
+		let target = event.target;
+		let popup = null;
+		if (target.id == GROUPS_MENU_ID) {
+			popup = GROUPS_POPUP_ID;
+		} else {
+			target = target.parentNode;
+			while (target.parentNode != null && target.parentNode.tagName != "window") {
+				if (target.id == GROUPS_POPUP_ID) {
+					popup = target;
+					break;
+				} else if (target.id == GROUPS_BTNPOPUP_ID) {
+					popup = target;
+					break;
+				}
+				target = target.parentNode;
+			}
+		}
+		if (popup) {
+			UI.openPopup(popup);
+		}
 		
 		event.stopPropagation();
 	}
 
 	// END DRAG DROP /////////////////////////////////////////////////////////////////////////////////
+	
+	function onSettings(event) {
+		let prefs = {};
+		for (let key in PREFS) {
+			prefs[key] = getPref(key);
+		}
+		let dialog = window.openDialog(
+			"resource://tabgroupsmenu/xul/options.xul", 
+			"Preferences", 
+			"chrome,titlebar,toolbar,centerscreen,modal",
+			prefs
+		);
+		let changedPrefs = {};
+		for (let key in prefs) {
+			if (getPref(key) != prefs[key]) {
+				changedPrefs[key] = prefs[key];
+			}
+		}
+		if (Object.keys(changedPrefs).length) {
+			// Save new set of options (cannot apply now because the uninstall checks the old value)
+			setPref("newPrefs", JSON.stringify(changedPrefs));
+			// reload addon
+			AddonManager.getAddonByID(EXT_ID, function(addon) {
+				addon.userDisabled = true;	
+				addon.userDisabled = false;
+			});
+		}
+	}
+	
+	function panoramaLoaded() {
+		GroupItems = window.TabView.getContentWindow().GroupItems;
+		GU.onPanoramaLoaded();
+		updateMenuLabels();
+	}
 
 	// Show tab groups (on event)
-	function showTabGroupsHandler(event) {
+	function showGroupsMenuHandler(event) {
+		if (GroupItems == null) {
+			let target = event.target;
+			if (target.id == GROUPS_BTNPOPUP_ID) {
+				target.hidePopup();
+			} else if (target.id == GROUPS_POPUP_ID) {
+				$(GROUPS_MENU_ID).open = false;
+			}
+			UI.markLoading();
+			window.TabView._initFrame(function() {
+				panoramaLoaded();
+				showGroupsMenu(event.target);
+				
+				UI.unmarkLoading();
+				
+				if (target.id == GROUPS_BTNPOPUP_ID) {
+					target.openPopup($(TABVIEW_BUTTON_ID), "after_pointer");
+				} else if (target.id == GROUPS_POPUP_ID) {
+					$(GROUPS_MENU_ID).open = true;
+				}
+			});
+			return;
+		}
+			
 		clearPopup(event.target);
-		showTabGroups(event.target); 
+		showGroupsMenu(event.target);
 	}
 	
 	// Show tab groups under given popup
-	function showTabGroups(popup, gid) {
+	function showGroupsMenu(popup, gid) {
 		let prefix = gid ? GroupItems.groupItem(gid).getTitle() : null;
+		if (gid && ! prefix) {
+			// we're showing subgroups of an unnamed group
+			return;
+		}
 
 		clearPopup(popup);
 
@@ -443,7 +612,7 @@ function processWindow(window) {
 			m.addEventListener("click", selectGroupEventHandler, true);
 			
 			let mp = $E("menupopup", { id: PREFIX + "group-popup-" + arr[1] });
-			mp.addEventListener("popupshowing", showGroupTabsHandler, false);
+			mp.addEventListener("popupshowing", showTabsMenuHandler, false);
 			
 			m.appendChild(mp);
 			popup.appendChild(m);
@@ -494,18 +663,39 @@ function processWindow(window) {
 			});
 		}
 
-        popup.appendChild($E("menuseparator"));
-		
-        let mi = $E("menuitem", { label: "New Group\u2026", "class": "menu-iconic" });
-		mi.addEventListener("command", onCreateGroup, false);
-		popup.appendChild(mi);
+		if (! gid) {
+			popup.appendChild($E("menuseparator"));
+			
+			let mi = $E("menuitem", { label: "New Group\u2026", "class": "menu-iconic" });
+			mi.addEventListener("command", onCreateGroup, false);
+			popup.appendChild(mi);
+
+			let sep = $E("menuseparator");
+			popup.appendChild(sep);
+			
+			let mi2 = $E("menuitem", { label: "Options" });
+			mi2.addEventListener("command", onSettings, false);
+			popup.appendChild(mi2);
+		}
 	} 
 
-	function showGroupTabsHandler(event) {
+	function showTabsMenuHandler(event) {
+		if (GroupItems == null) {
+			UI.markLoading();
+			$(TABS_MENU_ID).open = false;
+			window.TabView._initFrame(function() {
+				panoramaLoaded();
+				showTabsMenuHandler(event);
+				UI.unmarkLoading();
+				$(TABS_MENU_ID).open = true;
+			});
+			return;
+		}
+		
 		let popup = event.target; // menupopup
 		let gid;
 		
-		if (popup.id == CURRENT_GROUP_POPUP_ID) {
+		if (popup.id == TABS_POPUP_ID) {
 			gid = GroupItems.getActiveGroupItem().id;
 		} else {
 			gid = popup.parentNode.value;
@@ -514,15 +704,15 @@ function processWindow(window) {
 			return;
 		}
 
-		showTabGroups(popup, gid);
-		showGroupTabs(popup, gid);
+		showGroupsMenu(popup, gid);
+		showTabsMenu(popup, gid);
 
 		onGroupPopupShowing(event);
 		
 		event.stopPropagation();
 	}
 	
-	function showGroupTabs(mp, gid) {
+	function showTabsMenu(mp, gid) {
 		let group = GroupItems.groupItem(gid);
 		if (! group)
 			return;
@@ -561,10 +751,10 @@ function processWindow(window) {
                 }), false);
                 mp.appendChild(mi);
 			});
-		} else {
+		} else if (! GU.hasSubgroup(group)) {
 			// Group does not have tab so we add our new tab menu item
 			let mi = $E("menuitem", {
-				label: "New Tab",
+				label: "Open New Tab",
 				value: group.id
 			});
 			mp.appendChild(mi);
@@ -577,8 +767,8 @@ function processWindow(window) {
 		let menubar = $("main-menubar");
 		
 		let tabsMenu = $E("menu", {
-			id: MENUID,
-			label: "TabGroups",
+			id: GROUPS_MENU_ID,
+			label: getGroupsMenuLabel(),
 			accesskey: "G",
 			context: PREFIX + "extra-context"
 		});
@@ -595,11 +785,11 @@ function processWindow(window) {
 		// the default reads from context attribute
 		//tabsMenu.addEventListener("contextmenu", (function(event) event.preventDefault()), false);
 		let tabsMenuPopup = $E("menupopup", {
-			id: MENUID + "-popup",
+			id: GROUPS_POPUP_ID,
 			class: POPUP_CLASS
 		});
 		set_type(tabsMenuPopup, TYPE_MAIN_POPUP);
-		tabsMenuPopup.addEventListener("popupshowing", showTabGroupsHandler, false);
+		tabsMenuPopup.addEventListener("popupshowing", showGroupsMenuHandler, false);
 		tabsMenu.appendChild(tabsMenuPopup);
 
 		return function() {
@@ -613,8 +803,8 @@ function processWindow(window) {
         
 		let currentGroup = GroupItems ? GroupItems.getActiveGroupItem() : null;
         let menu = $E("menu", {
-			id: CURRENT_GROUP_MENU_ID,
-            label: getPref("useCurrentGroupNameInTabsMenu") && currentGroup ? currentGroup.getTitle() : "Tabs"
+			id: TABS_MENU_ID,
+            label: getTabsMenuLabel()
         });
 		if (! getPref("useCurrentGroupNameInTabsMenu")) {
 			menu.setAttribute("accesskey", "a");
@@ -622,10 +812,10 @@ function processWindow(window) {
         menubar.insertBefore(menu, menubar.lastChild);
 
         let popup = $E("menupopup", {
-            id: CURRENT_GROUP_POPUP_ID,
+            id: TABS_POPUP_ID,
             class: POPUP_CLASS
         });
-        popup.addEventListener("popupshowing", showGroupTabsHandler, false);
+        popup.addEventListener("popupshowing", showTabsMenuHandler, false);
         menu.appendChild(popup);
 
         return function() {
@@ -635,37 +825,49 @@ function processWindow(window) {
 
 	function addMenuToPanoramaButton() {
 		// Embed in tabview button
-		let tabviewButton = $("tabview-button");
+		let tabviewButton = $(TABVIEW_BUTTON_ID);
 		let btnPopup = null;
 		if (tabviewButton) {
-            // Embed tabgroups menu under this button
-            btnPopup = $E("menupopup", { 
-                id: MENUBTN + "-popup",
-                class: POPUP_CLASS // this must be addes so that css rules above works
-            });
-            set_type(btnPopup, TYPE_MAIN_POPUP);
-            listen(window, btnPopup, "popupshowing", showTabGroupsHandler, false);
-            // Prevent firefox toolbar context menu
-			listen(window, btnPopup, "context", function(event) {
-				event.preventDefault();
-				event.stopPropagation();
-			}, false);
-            tabviewButton.setAttribute("type", "menu-button");    
-            tabviewButton.appendChild(btnPopup);
-            
-            if (getPref('replacePanoramaButton')) {
-                listen(window, tabviewButton, "click", function(event) {
-					btnPopup.openPopup(tabviewButton, "after_start", 0, 0, false, false);
-					event.stopPropagation();
+			if (getPref("addButtonMenu") || getPref("replacePanoramaButton")) {
+				// Embed tabgroups menu under this button
+				btnPopup = $E("menupopup", { 
+					id: GROUPS_BTNPOPUP_ID,
+					class: POPUP_CLASS // this must be addes so that css rules above works
+				});
+				set_type(btnPopup, TYPE_MAIN_POPUP);
+				listen(window, btnPopup, "popupshowing", showGroupsMenuHandler, false);
+				// Prevent firefox toolbar context menu
+				listen(window, btnPopup, "context", function(event) {
 					event.preventDefault();
-				}, true);
+					event.stopPropagation();
+				}, false);
+				tabviewButton.appendChild(btnPopup);
+
+				if (getPref("addButtonMenu")) {
+					tabviewButton.setAttribute("type", "menu-button");
+				}
+				
+				if (getPref("replacePanoramaButton")) {
+					listen(window, tabviewButton, "click", function(event) {
+						if (event.target == tabviewButton) {
+							btnPopup.openPopup(tabviewButton, "after_start", 0, 0, false, false);
+							event.stopPropagation();
+							event.preventDefault();
+						}
+					}, true);
+				}
 			}
 		}
 
 		return function() {
 			if (tabviewButton) {
-				tabviewButton.removeChild(btnPopup);
-				tabviewButton.removeAttribute("type");
+				let popup = $(GROUPS_BTNPOPUP_ID);
+				if (popup) {
+					tabviewButton.removeChild(popup);
+					if (getPref("addButtonMenu")) {
+						tabviewButton.removeAttribute("type");
+					}
+				}
 			}
 		};
 	}
@@ -682,7 +884,7 @@ function processWindow(window) {
 			$E("menuseparator"),
 			$E("menuitem", { label: "New Tab" }, { command: onOpenNewTab }),
 			$E("menuseparator"),
-			$E("menuitem", { label: "New Subgroup" }, { command: onCreateSubGroup })
+			$E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup })
 		]);
 		// Cannot hide the menu if the context is shown because then the menu will not be selected again
 		groupContextMenu.setAttribute("id", PREFIX + "group-context");
@@ -700,9 +902,10 @@ function processWindow(window) {
 	unload(addMenuToPanoramaButton(), window);
 	unload(createContextMenu(), window);
 
-	if (getPref("useCurrentGroupNameInTabsMenu")) {
-		listen(window, gBrowser.tabContainer, "TabSelect", onTabSelectHandler, false);
-	}
+	listen(window, gBrowser.tabContainer, "TabSelect", onTabSelectHandler, false);
+	listen(window, gBrowser.tabContainer, "TabOpen", onTabOpenHandler, false);
+	listen(window, gBrowser.tabContainer, "TabClose", onTabCloseHandler, false);
+	listen(window, gBrowser.tabContainer, "TabMove", onTabMoveHandler, false);
 }
 
 function startup(data, reason) {
@@ -712,10 +915,19 @@ function startup(data, reason) {
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/tab.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/debug.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/prefs.js").spec, global);
-		
+
 		startDebugger();
 
 		setDefaultPrefs();
+
+		// Apply new prefs
+		let newPrefs = getPref("newPrefs");
+		if (newPrefs != null && newPrefs != "") {
+			let prefs = JSON.parse(newPrefs);
+			for (key in prefs) {
+				setPref(key, prefs[key]);
+			}
+		}
 
 		// Set resource substitution
 		let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
@@ -725,6 +937,15 @@ function startup(data, reason) {
 		}
 		resource.setSubstitution("tabgroupsmenu", alias);
 		unload(function() resource.setSubstitution("tabgroupsmenu", null));
+
+		// Whitelist XUL (see https://github.com/jvillalobos/Remote-XUL-Manager/blob/master/extension/modules/rxmPermissions.js)
+		let permSvc = Cc["@mozilla.org/permissionmanager;1"].getService(Ci.nsIPermissionManager);
+		let ioSvc = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+		let myURI = ioSvc.newURI("resource://tabgroupsmenu/xul/options.xul", null, null);
+		permSvc.add(myURI, "allowXULXBL", 1);
+		unload(function() {
+			permSvc.remove(myURI, "allowXULXBL");
+		});
  
 		// Load stylesheet
 		let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
@@ -736,16 +957,15 @@ function startup(data, reason) {
 				styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 		});
 		
-		watchWindows(initWindow);
-		
-		// make sure debugger is stopped last
-		unload(stopDebugger);
+		watchWindows(processWindow);
 	});
 }
-	
+
 function shutdown(data, reason) {
-	if (reason != APP_SHUTDOWN)
+	if (reason != APP_SHUTDOWN) {
 		unload();
+		stopDebugger();
+	}
 }
 
 function install() {}
