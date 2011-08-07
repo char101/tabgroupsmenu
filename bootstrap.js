@@ -44,33 +44,9 @@ function processWindow(window) {
 
 	let {$, $E, $EL} = createGeneralFuncs(window);
 
-	// Check if window already processed
-	if ($(GROUPS_MENU_ID))
-		return;
-	
 	let GU = createGroupFuncs(window);
 	let WU = createWindowFuncs(window);
 	let UI = createUIFuncs(window);
-
-	function currentPopup() {
-		return $( $(GROUPS_MENU_ID).open ? GROUPS_POPUP_ID : GROUPS_BTNPOPUP_ID );
-	}
-
-	function closeMenu() {
-		currentPopup().hidePopup();
-	}
-	
-	function refreshMenu() {
-		let popup = currentPopup();
-		popup.hidePopup();
-		popup.openPopup(popup.parentNode, "after_start", 0, 0, true, false);
-	}
-
-	function clearPopup(popup) {
-		while (popup.firstChild) {
-			popup.removeChild(popup.firstChild);
-		}
-	}
 
 	function onSelectTab(event) {
 		WU.selectTab(event.target.value);
@@ -147,42 +123,12 @@ function processWindow(window) {
 		UI.openPopup(document.popupNode.parentNode);
 	}
 
-	function selectGroupEventHandler(event) {
+	function onSelectGroup(event) {
 		if (event.button == 0) {
-			let groupItem = GU.findGroup(event.target.value);
-            if (groupItem) {
-                let activeGroupItem = GroupItems.getActiveGroupItem();
-                if (groupItem == activeGroupItem) {
-                    return;
-                }
-                selectGroup(groupItem);
-                
-                event.stopPropagation();
-                event.preventDefault();
-            }
+            if (GU.selectGroup(GU.findGroup(event.target.value)))
+                UI.closePopup(); // close menu if group successfully selected
 		}
-	}
-
-	function selectGroup(groupItem) {
-		// restore the last active tab in the group
-		let activeTab = groupItem.getActiveTab();
-		let tabItem = null;
-		if (activeTab) {
-			tabItem = activeTab;
-		} else {
-			// if not tab is active, use the first one
-			var child = groupItem.getChild(0)
-			if (child) {
-				tabItem = child;
-			}
-		}
-		if (tabItem) {
-            gBrowser.selectedTab = tabItem.tab;
-			closeMenu();
-		} else {
-			GroupItems.setActiveGroupItem(groupItem);
-		}
-	}
+	}	
 
 	function onOpenNewTab(event) {
 		let menu = document.popupNode;
@@ -285,7 +231,15 @@ function processWindow(window) {
 
 	// Called when switching tab
 	function onTabSelectHandler(event) {
-		if (getPref("useCurrentGroupNameInTabsMenu")) {
+		if (getPref("useCurrentGroupNameInTabsMenu") || getPref("showTabCount")) {
+            let group = GroupItems.getActiveGroupItem();
+            if (group) {
+                let lastGroupId = $(TABS_MENU_ID).getAttribute("groupid");
+                if (group.id == lastGroupId) {
+                    return;
+                }
+			    $(TABS_MENU_ID).setAttribute("groupid", group.id);
+            }
 			$(TABS_MENU_ID).setAttribute("label", getTabsMenuLabel());
 		}
 	}
@@ -448,9 +402,6 @@ function processWindow(window) {
 			GU.moveGroup(GU.findGroup(value), dstGroup);
 		}
 
-		// Updating menu works but the drop target styles doesn't seems cleared
-		// closeMenu();
-
 		// Reopen menu
 		let target = event.target;
 		let popup = null;
@@ -486,7 +437,7 @@ function processWindow(window) {
 		let dialog = window.openDialog(
 			"resource://tabgroupsmenu/xul/options.xul", 
 			"Preferences", 
-			"chrome,titlebar,toolbar,centerscreen,modal",
+			"dialog,centerscreen,modal",
 			prefs
 		);
 		let changedPrefs = {};
@@ -537,7 +488,6 @@ function processWindow(window) {
 			return;
 		}
 			
-		clearPopup(event.target);
 		showGroupsMenu(event.target);
 	}
 	
@@ -549,7 +499,7 @@ function processWindow(window) {
 			return;
 		}
 
-		clearPopup(popup);
+		UI.clearPopup(popup);
 
 		// Lisf of tab groups
 		let hasGroups = false;
@@ -609,7 +559,7 @@ function processWindow(window) {
 			m.addEventListener("dragstart", onTabDragStart, false);
 
 			// Select tab in group by clicking on the group title
-			m.addEventListener("click", selectGroupEventHandler, true);
+			m.addEventListener("click", onSelectGroup, true);
 			
 			let mp = $E("menupopup", { id: PREFIX + "group-popup-" + arr[1] });
 			mp.addEventListener("popupshowing", showTabsMenuHandler, false);

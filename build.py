@@ -28,6 +28,7 @@ zf.write('res/icon.png')
 zf.write('libs/moz-utils.js')
 zf.write('libs/my-utils.js')
 zf.write('libs/tab.js')
+zf.write('xul/options.xul')
 if is_debug:
     zf.write('libs/debug.js')
 else:

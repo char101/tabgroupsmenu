@@ -25,8 +25,8 @@ function isUnloaded(tab) {
 /**
  * General utility functions
  */
-function createGeneralFuncs(win) {
-    let {document} = win;
+function createGeneralFuncs(window) {
+    let {document} = window;
 
     // Get element with id
     function $(id) {
@@ -147,6 +147,21 @@ function createGroupFuncs(window) {
 		GroupItems.setActiveGroupItem(group);
 		gBrowser.loadOneTab("about:blank", { inBackground: false });
     };
+
+    GU.selectGroup = function GU_selectGroup(group) {
+		if (group == GroupItems.getActiveGroupItem())
+			return;
+		let tabItem = group.getActiveTab();
+		if (! tabItem) {
+			tabItem = group.getChild(0);
+		}
+		if (tabItem) {
+			gBrowser.selectedTab = tabItem.tab;
+			GroupItems.setActiveGroupItem(group);
+			return true;
+		}
+		return false;
+	};
 
     GU.renameGroup = function GU_renameGroup(group, newname) {
         let title = group.getTitle();
@@ -298,29 +313,30 @@ function createWindowFuncs(window) {
 function createUIFuncs(window) {
     let {document} = window;
     let UI = {};
+	let {$} = createGeneralFuncs(window);
     
     /**
      * Mark panorama loading in given element
      */
     UI.markLoading = function UI_markLoading() {
-        let menu = document.getElementById(GROUPS_MENU_ID);
+        let menu = $(GROUPS_MENU_ID);
         if (menu) {
             menu.setAttribute("class", "menu-iconic");
             menu.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
         }
-        let btn = document.getElementById(TABVIEW_BUTTON_ID);
+        let btn = $(TABVIEW_BUTTON_ID);
         if (btn) {
             btn.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
         }
     };
 
     UI.unmarkLoading = function UI_unmarkLoading() {
-        let menu = document.getElementById(GROUPS_MENU_ID);
+        let menu = $(GROUPS_MENU_ID);
         if (menu) {
             menu.setAttribute("class", "");
             menu.removeAttribute("image");
         }
-        let btn = document.getElementById(TABVIEW_BUTTON_ID);
+        let btn = $(TABVIEW_BUTTON_ID);
         if (btn) {
             btn.removeAttribute("image");
         }
@@ -328,13 +344,40 @@ function createUIFuncs(window) {
 
     UI.openPopup = function UI_openPopup(popup) {
         if (popup.id == GROUPS_POPUP_ID) {
-            document.getElementById(GROUPS_MENU_ID).open = false;
-            document.getElementById(GROUPS_MENU_ID).open = true;
+            $(GROUPS_MENU_ID).open = false;
+            $(GROUPS_MENU_ID).open = true;
         } else {
             popup.hidePopup();
-            popup.openPopup(document.getElementById(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
+            popup.openPopup($(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
         }
     };
+
+	UI.currentPopup = function UI_currentPopup() {
+		if ($(GROUPS_MENU_ID).open) {
+			return $(GROUPS_POPUP_ID);
+		}
+		let popup = $(BUTTON_POPUP_ID);
+		if (popup && popup.state == "open") {
+			return popup;
+		}
+		return null;
+	};
+	
+	UI.closePopup = function UI_closePopup(popup) {
+		if (popup == undefined) {
+			// Find open popup
+			popup = UI.currentPopup();
+		}
+		if (popup) {
+			popup.hidePopup();
+		}
+	};
+
+	UI.clearPopup = function UI_clearPopup(popup) {
+		while (popup.firstChild) {
+			popup.removeChild(popup.firstChild);
+		}
+	};
 
     return UI;
 }
