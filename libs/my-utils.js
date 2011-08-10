@@ -26,7 +26,9 @@ function isUnloaded(tab) {
  * General utility functions
  */
 function createGeneralFuncs(window) {
-    let {document} = window;
+	const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+    
+	let {document} = window;
 
     // Get element with id
     function $(id) {
@@ -53,9 +55,13 @@ function createGeneralFuncs(window) {
 		return el;
 	}
 
-	function $EL(tag, children) {
+	function $EL(tag, children, attrs) {
 		let el = document.createElementNS(XUL_NS, tag);
-		children.forEach(function(child) el.appendChild(child));
+		if (typeof(children) == "object" && children instanceof Array)
+			children.forEach(function(child) el.appendChild(child));
+		if (typeof(attrs) == "object") 
+			for (let key in attrs) 
+				el.setAttribute(key, attrs[key]);
 		return el;
 	}
 
