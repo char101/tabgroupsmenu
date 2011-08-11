@@ -363,7 +363,7 @@ function createUIFuncs(window) {
 			return $(GROUPS_POPUP_ID);
 		}
         if ($(TABS_MENU_ID).open) {
-            return $(TABS_MENU_ID);
+            return $(TABS_POPUP_ID);
         }
 		let popup = $(BUTTON_POPUP_ID);
 		if (popup && popup.state == "open") {
