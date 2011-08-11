@@ -84,7 +84,7 @@ function processWindow(window) {
 	function onCloseGroup(event) {
 		let menu = document.popupNode;
 		let group = GU.findGroup(menu.value);
-        let popup = UI.currentPopup();
+        let popup = UI.findPopup(menu);
 		
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
 		if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
@@ -96,7 +96,7 @@ function processWindow(window) {
 	}
 
 	function onRenameGroup(event) {
-        let popup = UI.currentPopup();
+        let popup = UI.findPopup(document.popupNode);
 		let group = GroupItems.groupItem(document.popupNode.value);
 		let title = group.getTitle();
 		let parts = title.split(GROUP_SEPARATOR);

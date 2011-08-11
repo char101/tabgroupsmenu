@@ -362,6 +362,9 @@ function createUIFuncs(window) {
 		if ($(GROUPS_MENU_ID).open) {
 			return $(GROUPS_POPUP_ID);
 		}
+        if ($(TABS_MENU_ID).open) {
+            return $(TABS_MENU_ID);
+        }
 		let popup = $(BUTTON_POPUP_ID);
 		if (popup && popup.state == "open") {
 			return popup;
@@ -384,6 +387,18 @@ function createUIFuncs(window) {
 			popup.removeChild(popup.firstChild);
 		}
 	};
+
+    UI.findPopup = function UI_findPopup(element) {
+        while (true) {
+            if (element.id == GROUPS_POPUP_ID || element.id == TABS_POPUP_ID || element.id == GROUPS_BTNPOPUP_ID) {
+                return element;
+            }
+            element = element.parentNode;
+            if (! element)
+                break;
+        }
+        return null;
+    };
 
     return UI;
 }

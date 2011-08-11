@@ -1,6 +1,8 @@
 import sys
 import zipfile
 import re
+import glob
+import os
 
 cmt_re = re.compile(r'\s*//.*')
 ver_re = re.compile(r'<version>[0-9a-z.]+</version>') 
@@ -18,6 +20,9 @@ if len(sys.argv) == 3 and sys.argv[2] == '1':
 str = open('install.rdf', 'rb').read()
 str = ver_re.sub('<version>%s</version>' % version, str)
 open('install.rdf', 'wb').write(str)
+
+for file in glob.glob('../tabgroupsmenu@char.cc-*.xpi'):
+    os.unlink(file)
 
 zf = zipfile.ZipFile("../tabgroupsmenu@char.cc-%s%s.xpi" % (version, '-debug' if is_debug else ''), 'w', zipfile.ZIP_DEFLATED)
 
