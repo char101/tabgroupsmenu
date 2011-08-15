@@ -26,7 +26,7 @@ const TABVIEW_BUTTON_ID = "tabview-button";
 
 const POPUP_CLASS = PREFIX + "popup";
 
-const GROUP_SEPARATOR = " \u2329 ";
+const GROUP_SEPARATOR = " \u2022 ";
 
 function processWindow(window) {
 	let {document, gBrowser} = window;
