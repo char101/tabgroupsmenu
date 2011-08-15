@@ -155,6 +155,8 @@ function createGroupFuncs(window) {
     };
 
     GU.selectGroup = function GU_selectGroup(group) {
+        if (! group)
+            return;
 		if (group == GroupItems.getActiveGroupItem())
 			return;
 		let tabItem = group.getActiveTab();
@@ -220,11 +222,16 @@ function createGroupFuncs(window) {
 
     GU.closeGroup = function GU_closeGroup(group) {
         // Close children
-        GroupItems.groupItems.forEach(function(gr) {
-            if (GU.isChild(gr, group)) {
-                GU.closeGroup(gr);
+        let children = [];
+        for (let i = 0, n = GroupItems.groupItems.length; i < n; ++i) {
+            if (GU.isChild(GroupItems.groupItems[i], group)) {
+                children.push(GroupItems.groupItems[i]);
             }
-        });
+        }
+        while (children.length) {
+            let child = children.pop();
+            child.destroy();
+        }
         group.destroy();
     };
 

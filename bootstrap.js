@@ -26,7 +26,7 @@ const TABVIEW_BUTTON_ID = "tabview-button";
 
 const POPUP_CLASS = PREFIX + "popup";
 
-const GROUP_SEPARATOR = " ~> ";
+const GROUP_SEPARATOR = " \u2329 ";
 
 function processWindow(window) {
 	let {document, gBrowser} = window;
@@ -89,10 +89,21 @@ function processWindow(window) {
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
 		if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
 			GU.closeGroup(group);
+			updateMenuLabels();
 		}
 
 		// Reopen menu
 		UI.openPopup(popup);
+	}
+
+	function onCloseCurrentGroup(event) {
+		let group = GroupItems.getActiveGroupItem();
+		if (group) {
+			if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
+				GU.closeGroup(group);
+				updateMenuLabels();
+			}	
+		}
 	}
 
 	function onRenameGroup(event) {
@@ -111,10 +122,33 @@ function processWindow(window) {
 					return;
 				}
 				GU.renameGroup(group, newname);
+				updateMenuLabels();
 			}
 		}
 		// Reopen menu
 		UI.openPopup(popup);
+	}
+
+	function onRenameCurrentGroup(event) {
+		let group = GroupItems.getActiveGroupItem();
+		if (group) {
+			let title = group.getTitle();
+			let parts = title.split(GROUP_SEPARATOR);
+			let oldname = parts.pop();
+			let newname = WU.prompt("Rename Group (" + title + ")", "New group name: ", oldname);
+			if (newname) {
+				newname = newname.trim();
+				if (newname && newname != oldname) {
+					let fullname = parts.length > 0 ? parts.join(GROUP_SEPARATOR) + GROUP_SEPARATOR + newname : newname;
+					if (GroupItems.groupItems.some(function(group) group.getTitle() == fullname)) {
+						WU.alert("Failed to rename group", "Group with title \"" + newname + "\" already exists.");
+						return;
+					}
+					GU.renameGroup(group, newname);
+					updateMenuLabels();
+				}
+			}
+		}
 	}
 
 	function onSelectGroup(event) {
@@ -559,7 +593,7 @@ function processWindow(window) {
 			m.addEventListener("click", onSelectGroup, true);
 			
 			let mp = $E("menupopup", { id: PREFIX + "group-popup-" + arr[1] });
-			mp.addEventListener("popupshowing", showTabsMenuHandler, false);
+			mp.addEventListener("popupshowing", onShowTabsMenu, false);
 			
 			m.appendChild(mp);
 			popup.appendChild(m);
@@ -625,13 +659,13 @@ function processWindow(window) {
 		}
 	} 
 
-	function showTabsMenuHandler(event) {
+	function onShowTabsMenu(event) {
 		if (GroupItems == null) {
 			UI.markLoading();
 			$(TABS_MENU_ID).open = false;
 			window.TabView._initFrame(function() {
 				panoramaLoaded();
-				showTabsMenuHandler(event);
+				onShowTabsMenu(event);
 				UI.unmarkLoading();
 				$(TABS_MENU_ID).open = true;
 			});
@@ -642,7 +676,10 @@ function processWindow(window) {
 		let gid;
 		
 		if (popup.id == TABS_POPUP_ID) {
-			gid = GroupItems.getActiveGroupItem().id;
+			let group = GroupItems.getActiveGroupItem();
+			if (! group)
+				return;
+			gid = group.id;
 		} else {
 			gid = popup.parentNode.value;
 		}
@@ -705,6 +742,11 @@ function processWindow(window) {
 			mp.appendChild(mi);
 			mi.addEventListener("command", onCreateTabInGroup, false);
 		}
+        
+        mp.appendChild($E("menuseparator"));
+
+        mp.appendChild($E("menuitem", { label: "Close Group" }, { command: onCloseCurrentGroup }));
+		mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameCurrentGroup }));
 	}
 	
     // Adds a menu to the menubar and to the panorama button
@@ -757,7 +799,7 @@ function processWindow(window) {
             id: TABS_POPUP_ID,
             class: POPUP_CLASS
         });
-        popup.addEventListener("popupshowing", showTabsMenuHandler, false);
+        popup.addEventListener("popupshowing", onShowTabsMenu, false);
         menu.appendChild(popup);
 
         return function() {
