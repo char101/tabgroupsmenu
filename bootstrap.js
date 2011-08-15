@@ -84,16 +84,17 @@ function processWindow(window) {
 	function onCloseGroup(event) {
 		let menu = document.popupNode;
 		let group = GU.findGroup(menu.value);
+        let title = group.getTitle();
         let popup = UI.findPopup(menu);
 		
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
-		if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
+		if (WU.confirm("Close Group", "Really close this group and its children: \"" + title + "\" ?\n\nWarning: this operations cannot be undone!")) {
 			GU.closeGroup(group);
 			updateMenuLabels();
 		}
 
 		// Reopen menu
-		UI.openPopup(popup);
+		UI.openPopup(popup, title);
 	}
 
 	function onCloseCurrentGroup(event) {
@@ -126,7 +127,7 @@ function processWindow(window) {
 			}
 		}
 		// Reopen menu
-		UI.openPopup(popup);
+		UI.openPopup(popup, group);
 	}
 
 	function onRenameCurrentGroup(event) {
@@ -439,7 +440,7 @@ function processWindow(window) {
 		let target = event.target;
 		let popup = null;
 		if (target.id == GROUPS_MENU_ID) {
-			popup = GROUPS_POPUP_ID;
+			popup = $(GROUPS_POPUP_ID);
 		} else {
 			target = target.parentNode;
 			while (target.parentNode != null && target.parentNode.tagName != "window") {
@@ -454,7 +455,7 @@ function processWindow(window) {
 			}
 		}
 		if (popup) {
-			UI.openPopup(popup);
+			UI.openPopup(popup, dstGroup);
 		}
 		
 		event.stopPropagation();
@@ -578,6 +579,7 @@ function processWindow(window) {
 			let m = $E("menu", {
 				id: PREFIX + "group-" + arr[1],
 				label: GU.getFormattedTitle(GroupItems.groupItem(arr[1]), prefix),
+                alt_label: GU.removePrefix(GroupItems.groupItem(arr[1]).getTitle(), prefix),
 				value: arr[1],
 				"class": arr[2]
 			});

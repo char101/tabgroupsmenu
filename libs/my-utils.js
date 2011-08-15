@@ -99,13 +99,17 @@ function createGroupFuncs(window) {
         return group;
     };
 
+    GU.removePrefix = function GU_removePrefix(title, prefix) {
+        return prefix ? title.substr(prefix.length + GROUP_SEPARATOR.length) : title;
+    };
+    
     GU.getFormattedTitle = function GU_getFormattedTitle(group, prefix) {
         let title = group.getTitle();
         if (! title) {
             title = group.id;
         }
         if (prefix) {
-            title = title.substr(prefix.length + GROUP_SEPARATOR.length);
+            title = GU.removePrefix(title, prefix);
         }
         let nSubGroups = 0, nTabs = group.getChildren().length;
         let prefix = title + GROUP_SEPARATOR;
@@ -355,13 +359,35 @@ function createUIFuncs(window) {
         }
     };
 
-    UI.openPopup = function UI_openPopup(popup) {
+    UI.openPopup = function UI_openPopup(popup, group, openGroup) {
+        UI.clearPopup(popup);
         if (popup.id == GROUPS_POPUP_ID) {
             $(GROUPS_MENU_ID).open = false;
             $(GROUPS_MENU_ID).open = true;
         } else {
             popup.hidePopup();
             popup.openPopup($(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
+        }
+
+        // Select given group (menu -> menupopup -> [menu|menuitem]
+        if (group) {
+            let title = typeof(group) == "string" ? group : group.getTitle();
+            if (! title)
+                return;
+            let parts = title.split(GROUP_SEPARATOR);
+            if (! openGroup)
+                parts.pop();
+            while (parts.length) {
+                let label = parts.shift();
+                for (let i = 0, n = popup.children.length; i < n; ++i) {
+                    let child = popup.children[i];
+                    if (child.tagName == "menu" && child.getAttribute("alt_label") == label) {
+                        child.open = true;
+                        popup = child.firstChild;
+                        break;
+                    }
+                }
+            }
         }
     };
 
