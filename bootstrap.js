@@ -103,7 +103,12 @@ function processWindow(window) {
 			}
 		}
 	}
-	
+
+    function onBookmarkGroup(event) {
+        let group = GU.findGroup(document.popupNode.value);
+        GU.bookmarkGroup(group);
+    }
+    
 	function onCreateTabInGroup(event) {
 		let group = GU.findGroup(event.target.value);
 		GU.createTabInGroup(group);
@@ -884,7 +889,7 @@ function processWindow(window) {
 				let cls = "menuitem-iconic";
 				if (tab.selected) {
 					cls += " current";
-				} else if (isUnloaded(tab)) {
+				} else if (WU.isUnloaded(tab)) {
 					cls += " unloaded";
 				}
 				let mi = $E("menuitem", {
@@ -974,18 +979,18 @@ function processWindow(window) {
                 let cls = "menuitem-iconic";
                 if (tab.selected) {
                     cls += " current";
-                } else if (isUnloaded(tab)) {
+                } else if (WU.isUnloaded(tab)) {
                     cls += " unloaded";
                 }
                 let tabindex = tabs.getIndexOfItem(tab);
                 let mi = $E("menuitem", {
                     id: PREFIX + "tab-" + tabindex,
                     class: cls,
-                    label: $A(tab, "label"),
+                    label: tab.getAttribute("label"),
 					groupid: gid,
                     value: tabindex,
                     closemenu: "none",
-					context: TAB_MENUITEM_CONTEXT_ID
+					context: TAB_MENUITEM_CONTEXT_ID,
                 });
                 copyattr(mi, tab, "image");
                 copyattr(mi, tab, "busy");
@@ -1136,7 +1141,9 @@ function processWindow(window) {
             $EL("menu", [ $E("menupopup") ], { label: "Move Group To\u2026" }),
 			$E("menuseparator"),
 			$E("menuitem", { label: "New Tab" }, { command: onOpenNewTab }),
-			$E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup })
+			$E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup }),
+            $E("menuseparator"),
+            $E("menuitem", { label: "Bookmark Group" }, { command: onBookmarkGroup })
 		], {
             id: GROUP_MENUITEM_CONTEXT_ID
         });

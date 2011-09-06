@@ -9,16 +9,8 @@ function remove(el) {
     el.parentNode.removeChild(el);
 }
 
-function set_type(el, type) {
-	el.setAttribute(ATTR_TYPE, type);
-}
-
 function $A(el, attr, def) {
     return (el.hasAttribute(attr) ? el.getAttribute(attr) : def);
-}
-
-function isUnloaded(tab) {
-    return tab.linkedBrowser.userTypedValue != null;
 }
 
 function $T(tab) tab._tabViewTabItem;
@@ -344,7 +336,31 @@ function createGroupFuncs(window) {
         return srcTitle != dstTitle &&
                ! GU.isChild(dstTitle, srcTitle) &&
                ! GU.isParent(srcTitle, dstTitle);
-    }
+    };
+
+    GU.bookmarkGroup = function GU_bookmarkGroup(group) {
+        let bm = Cc["@mozilla.org/browser/nav-bookmarks-service;1"].getService(Ci.nsINavBookmarksService);
+        let ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
+        let title = GU.getTitle(group);
+        let folder = bm.createFolder(bm.bookmarksMenuFolder, title, bm.DEFAULT_INDEX);
+        let children = group.getChildren();
+        for (let i = 0, n = children.length; i < n; ++i) {
+            let tab = children[i].tab;
+            let browser = gBrowser.getBrowserForTab(tab);
+            let uri = null;
+            if (browser) {
+                if (browser.uri)
+                    uri = browser.uri;
+                if (browser.userTypedValue)
+                    uri = browser.userTypedValue;
+            }
+            if (uri != null && uri != undefined && uri != "" && uri != "about:blank") {
+                bm.insertBookmark(folder, ios.newURI(uri, null, null), bm.DEFAULT_INDEX, tab.getAttribute("label"));
+            }
+        }
+        let prompt = Cc["@mozilla.org/embedcomp/prompt-service;1"].getService(Ci.nsIPromptService);
+        prompt.alert(window, "Bookmark Created", 'Bookmark folder "' + title + '" created with ' + children.length + " entr" + (children.length > 1 ? "ies" : "y"));
+    };
 
     return GU;
 }
@@ -387,8 +403,22 @@ function createWindowFuncs(window) {
         return [ret, value.value, check.value];
     }
 
-    WU.getNumberOfTabs = function GU_getNUmberOfTabs() {
+    WU.getNumberOfTabs = function WU_getNUmberOfTabs() {
         return gBrowser.tabs.length;  
+    };
+
+    WU.getTabURL = function WU_getTabURL(tab) {
+        let browser = gBrowser.getBrowserForTab(tab);
+        if (browser) {
+            if (browser.uri)
+                return browser.uri.spec;
+            if (browser.userTypedValue)
+                return browser.userTypedValue;
+        }
+    };
+
+    WU.isUnloaded = function WU_isUnloaded(tab) {
+        return tab.linkedBrowser.userTypedValue != null;
     };
 
     return WU;
