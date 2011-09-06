@@ -173,8 +173,11 @@ function createGroupFuncs(window) {
     };
 
     GU.createTabInGroup = function GU_createTabInGroup(group) {
+        // In newer version this automatically creates a new tab
 		GroupItems.setActiveGroupItem(group);
-		return gBrowser.loadOneTab("about:blank", { inBackground: false });
+        if (group.getChildren().length == 0) {
+		    return gBrowser.loadOneTab("about:blank", { inBackground: false });
+        }
     };
 
     GU.selectGroup = function GU_selectGroup(group) {
