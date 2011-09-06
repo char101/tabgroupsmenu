@@ -6,6 +6,8 @@ Cu.import("resource://gre/modules/AddonManager.jsm");
 const EXT_ID = "tabgroupsmenu@char.cc";
 const global = this;
 
+let PROTOCOL = "tabgroupsmenu";
+
 const PREFIX = "grouptabs-";
 
 const GROUPS_MENU_ID = PREFIX + "menu";
@@ -35,6 +37,12 @@ const BUTTON_LEFT = 0;
 const BUTTON_MIDDLE = 1;
 const BUTTON_RIGHT = 2;
 const KEY_CTRL = 17;
+
+let canUseManifest = typeof(Components.manager.addBootstrappedManifestLocation) != "undefined";
+let protocol = null;
+function getChromeURI(path) {
+    return canUseManifest ? ("chrome://tabgroupsmenu/content/" + path) : ("tabgroupsmenu://chrome/" + path);
+}
 
 function processWindow(window) {
 	let {document, gBrowser} = window;
@@ -721,14 +729,11 @@ function processWindow(window) {
 	function onSettings(event) {
 		let prefs = {};
 		for (let key in PREFS) {
-			prefs[key] = getPref(key);
+            if (key != "newPrefs") {
+			    prefs[key] = getPref(key);
+            }
 		}
-		let dialog = window.openDialog(
-			"resource://tabgroupsmenu/xul/options.xul", 
-			"Preferences", 
-			"dialog,centerscreen,modal",
-			prefs
-		);
+		let dialog = window.openDialog(getChromeURI("options.xul"), "Preferences", "chrome,centerscreen", prefs);
 		let changedPrefs = {};
 		for (let key in prefs) {
 			if (getPref(key) != prefs[key]) {
@@ -1159,15 +1164,28 @@ function processWindow(window) {
 }
 
 function startup(data, reason) {
-	AddonManager.getAddonByID(data.id, function(addon) {
+    AddonManager.getAddonByID(data.id, function(addon) {
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/moz-utils.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/my-utils.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/debug.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/prefs.js").spec, global);
-
-		startDebugger();
+		
+        startDebugger();
 
 		setDefaultPrefs();
+        
+        // register chrome
+        if (canUseManifest) {
+            Components.manager.addBootstrappedManifestLocation(data.installPath);
+        } else {
+            Services.scriptloader.loadSubScript(addon.getResourceURI("libs/protocol.js").spec, global);
+            protocol = new Protocol();
+            protocol.register(data.installPath);
+            unload(function() {
+                protocol.unregister();
+                protocol = null;
+            });
+        }
 
 		// Apply new prefs
 		let newPrefs = getPref("newPrefs");
@@ -1178,28 +1196,9 @@ function startup(data, reason) {
 			}
 		}
 
-		// Set resource substitution
-		let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
-		let alias = Services.io.newFileURI(data.installPath);
-		if (! data.installPath.isDirectory()) {
-			alias = Services.io.newURI("jar:" + alias.spec + "!/", null, null);
-		}
-		resource.setSubstitution("tabgroupsmenu", alias);
-		unload(function() resource.setSubstitution("tabgroupsmenu", null));
-
-		// Whitelist XUL (see https://github.com/jvillalobos/Remote-XUL-Manager/blob/master/extension/modules/rxmPermissions.js)
-		let permSvc = Cc["@mozilla.org/permissionmanager;1"].getService(Ci.nsIPermissionManager);
-		let ioSvc = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-		let myURI = ioSvc.newURI("resource://tabgroupsmenu/xul/options.xul", null, null);
-		permSvc.add(myURI, "allowXULXBL", 1);
-		unload(function() {
-			permSvc.remove(myURI, "allowXULXBL");
-		});
- 
 		// Load stylesheet
 		let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
-		let ioService = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-		let styleUri = ioService.newURI("resource://tabgroupsmenu/res/style.css", null, null);
+        let styleUri = addon.getResourceURI("res/style.css");
 		styleSheetService.loadAndRegisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 		unload(function() {
 			if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET))
@@ -1215,6 +1214,9 @@ function shutdown(data, reason) {
 		unload();
 		stopDebugger();
 	}
+    if (canUseManifest) {
+        Components.manager.removeBootstrappedManifestLocation(data.installPath);
+    }
 }
 
 function install() {}

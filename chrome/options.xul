@@ -12,18 +12,22 @@
 
 	<script type="application/javascript">
 		function onLoad() {
-			let prefs = window.arguments[0];
-			for (let key in prefs) {
-				let el = document.getElementById("opt-" + key);
-				if (el) el.checked = prefs[key];
+			if (window.arguments) {
+				let prefs = window.arguments[0];
+				for (let key in prefs) {
+					let el = document.getElementById("opt-" + key);
+					if (el) el.checked = prefs[key];
+				}
 			}
 		}
 		
 		function onAccept() { 
-			let prefs = window.arguments[0];
-			for (let key in prefs) {
-				let el = document.getElementById("opt-" + key);
-				if (el) prefs[key] = el.checked;
+			if (window.arguments) {
+				let prefs = window.arguments[0];
+				for (let key in prefs) {
+					let el = document.getElementById("opt-" + key);
+					if (el) prefs[key] = el.checked;
+				}
 			}
 			return true;
 		}

@@ -26,13 +26,15 @@ for file in glob.glob('../tabgroupsmenu@char.cc-*.xpi'):
 
 zf = zipfile.ZipFile("../tabgroupsmenu@char.cc-%s%s.xpi" % (version, '-debug' if is_debug else ''), 'w', zipfile.ZIP_DEFLATED)
 
-zf.write('bootstrap.js', 'bootstrap.js')
-zf.write('install.rdf', 'install.rdf')
+zf.write('bootstrap.js')
+zf.write('install.rdf')
+zf.write('chrome.manifest')
 zf.write('res/style.css')
 zf.write('res/icon.png')
 zf.write('libs/moz-utils.js')
 zf.write('libs/my-utils.js')
-zf.write('xul/options.xul')
+zf.write('libs/protocol.js')
+zf.write('chrome/options.xul')
 if is_debug:
     zf.write('libs/debug.js')
 else:
