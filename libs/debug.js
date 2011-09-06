@@ -16,33 +16,32 @@ function startDebugger() {
                 jsd.errorHook = {
                     // TODO: only report error from tabgroups ext
                     onError: function(message, fileName, lineNo, colNo, flags, errnum, exc) {
-                        //if (message.toLowerCase().indexOf("tabgroupsmenu") != -1) {
-                            // check message type  
-                            var jsdIErrorHook = Components.interfaces.jsdIErrorHook;  
-                            var messageType;          
-                            if (flags & jsdIErrorHook.REPORT_ERROR)  
-                                messageType = "Error";  
-                            else if (flags & jsdIErrorHook.REPORT_WARNING)  
-                                messageType = "Warning";  
-                            else if (flags & jsdIErrorHook.REPORT_EXCEPTION)  
-                                messageType = "Uncaught-Exception";  
-                            if (flags & jsdIErrorHook.REPORT_STRICT)  
-                                messageType += "-Strict";
+                        // check message type  
+                        var jsdIErrorHook = Components.interfaces.jsdIErrorHook;  
+                        var messageType;          
+                        if (flags & jsdIErrorHook.REPORT_ERROR)  
+                            messageType = "Error";  
+                        else if (flags & jsdIErrorHook.REPORT_WARNING)  
+                            messageType = "Warning";  
+                        else if (flags & jsdIErrorHook.REPORT_EXCEPTION)  
+                            messageType = "Uncaught-Exception";  
+                        if (flags & jsdIErrorHook.REPORT_STRICT)  
+                            messageType += "-Strict";
 
-                            LOG(messageType + ": " + message + "@" + fileName + "@" + lineNo + "@" + colNo + "@" + errnum + "\n");  
-                            
-                            // do not trigger debugHook  
-                            return false;
-                        //}
-                        //return true;
+                        LOG(messageType + ": " + message + "@" + fileName + "@" + lineNo + "@" + colNo + "@" + errnum + "\n");  
+                        
+                        // trigger debugHook
+                        return false;
                     }  
                 };
                 jsd.debugHook = {  
                     onExecute: function(frame, type, rv) {  
-                        stackTrace = "";  
-                        for (var f = frame; f; f = f.callingFrame) {  
+                        let stackTrace = "";  
+                        for (let f = frame; f; f = f.callingFrame) {  
                             stackTrace += f.script.fileName + "@" + f.line + "@" + f.functionName + "\n";  
-                        }                  
+                        }
+                        LOG("debookHook");
+                        LOG(stackTrace);
                         return Components.interfaces.jsdIExecutionHook.RETURN_CONTINUE;  
                     }  
                 };

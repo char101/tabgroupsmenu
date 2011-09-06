@@ -15,6 +15,6 @@
 }
 .grouptabs-popup .current > .menu-iconic-text { font-weight: bold !important; }
 .grouptabs-popup menuitem.marked .menu-iconic-text { color: #0000ff !important; }
-.grouptabs-popup menuitem.unloaded .menu-iconic-text { color: #777777; }
+.grouptabs-popup menuitem.unloaded .menu-iconic-text { opacity: 0.5; }
 .grouptabs-popup menuitem.fake .menu-iconic-text { color: #b60000; }
 .grouptabs-popup menu.loading > .menu-iconic-left > .menu-iconic-icon { list-style-image: url(chrome://browser/skin/places/searching_16.png); }

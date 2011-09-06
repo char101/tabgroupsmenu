@@ -10,11 +10,13 @@ const PREFIX = "grouptabs-";
 
 const GROUPS_MENU_ID = PREFIX + "menu";
 const GROUPS_POPUP_ID = PREFIX + "menu-popup";
-const GROUPS_CONTEXT_ID = PREFIX + "context";
 const GROUPS_MENU_LABEL = "TabGroups";
 
 const TABS_MENU_ID = PREFIX + "cgm";
 const TABS_POPUP_ID = PREFIX + "cgp";
+
+const GROUP_MENUITEM_CONTEXT_ID = PREFIX + "context-group";
+const TAB_MENUITEM_CONTEXT_ID = PREFIX + "context-tab";
 
 const GROUPS_BTN_ID = PREFIX + "btn";
 const GROUPS_BTNPOPUP_ID = PREFIX + "btn-popup";
@@ -24,9 +26,15 @@ const BUTTON_POPUP_ID = PREFIX + "btn-popup";
 
 const TABVIEW_BUTTON_ID = "tabview-button";
 
+// for CSS styling
 const POPUP_CLASS = PREFIX + "popup";
 
 const GROUP_SEPARATOR = " \u2022 ";
+
+const BUTTON_LEFT = 0;
+const BUTTON_MIDDLE = 1;
+const BUTTON_RIGHT = 2;
+const KEY_CTRL = 17;
 
 function processWindow(window) {
 	let {document, gBrowser} = window;
@@ -34,14 +42,27 @@ function processWindow(window) {
 	let gTabView = gBrowser.TabView;
 	let deleteList = [];
 
-	let {$, $E, $EL} = createGeneralFuncs(window);
+	let {$, $E, $EL, $F} = createGeneralFuncs(window);
 
 	let GU = createGroupFuncs(window);
 	let WU = createWindowFuncs(window);
 	let UI = createUIFuncs(window);
 
-	function onSelectTab(event) {
-		WU.selectTab(event.target.value);
+	function onSelectTabMenuItem(event) {
+        if (! event.ctrlKey) {
+            // Select tab and close menu
+		    WU.selectTab(event.target.value);
+            UI.closePopup();
+        } else {
+            // Mark multiple selection
+            let menuitem = event.target;
+			let cls = menuitem.hasAttribute("class") ? menuitem.getAttribute("class") + " " : "";
+			if (! cls.match(/marked/)) {
+				menuitem.setAttribute("class", cls + "marked");
+			} else {
+				menuitem.setAttribute("class", cls.replace(/\s*\bmarked\b/, ""));
+			}
+        }
 	}
 	
 	function onCreateGroup(event) {
@@ -152,10 +173,94 @@ function processWindow(window) {
 		}
 	}
 
-	function onSelectGroup(event) {
-		if (event.button == 0) {
-            if (GU.selectGroup(GU.findGroup(event.target.value)))
-                UI.closePopup(); // close menu if group successfully selected
+	function onGroupMenuItemClick(event) {
+		switch (event.button) {
+			case BUTTON_LEFT: {
+				// Select group
+				if (GU.selectGroup(GU.findGroup(event.target.value)))
+					UI.closePopup(); // close menu if group successfully selected
+				break;
+            }
+			case BUTTON_RIGHT: {
+				// Populate context menu
+                let popup = $(GROUP_MENUITEM_CONTEXT_ID).childNodes[2].childNodes[0];
+                UI.clearPopup(popup);
+				
+                let groups = [];
+                let gid = event.target.value;
+                let group = GroupItems.groupItem(gid);
+				let srcTitle = group.getTitle();
+                GroupItems.groupItems.forEach(function(gr) {
+					// Don't filter the disabled target here otherwise the tree structure might get broken
+					groups.push([gr.id, GU.getTitle(gr)]);
+                });
+                groups.sort(function(a, b) a[1].localeCompare(b[1]));
+                
+				let stack = [];
+				let parent = popup;
+				let addMoveHere = function(parent) {
+					parent.appendChild($E("menuseparator"));
+					parent.appendChild($E("menuitem", {
+						label: "Move Here", 
+						value: parent.parentNode.value[0],
+						disabled: GU.canMove(srcTitle, parent.parentNode.value[1])
+					}, { 
+						command: onMoveGroups 
+					}));
+				};
+                for (let i = 0, n = groups.length; i < n; ++i) {
+					let level = GU.getLevel(groups[i][1]);
+					let nextLevel = (i < (n-1)) ? GU.getLevel(groups[i+1][1]) : level;
+					//LOG($F("{0} level {1} nextLevel {2}", groups[i][1], level, nextLevel));
+					if (level < nextLevel) {
+						let _menu = $E("menu", {
+							label: GU.splitTitle(groups[i][1]).name, 
+							value: groups[i] // now a typo, the value is an array
+						});
+						let _popup = $E("menupopup");
+						_menu.appendChild(_popup);
+						parent.appendChild(_menu);
+						stack.push(parent);
+						parent = _popup;
+					} else {
+						parent.appendChild($E("menuitem", {
+							label: GU.splitTitle(groups[i][1]).name,
+							value: groups[i][0],
+							disabled: GU.canMove(srcTitle, groups[i][1])
+						}, {
+							command: onMoveGroups			
+						}));
+
+						if (level > nextLevel) {
+							addMoveHere(parent);
+							let diff = level - nextLevel;
+							while (diff-- > 0) {
+								parent = stack.pop();
+								if (diff > 0)
+									addMoveHere(parent);		
+							}
+						}	
+					}
+                }
+				if (stack.length) {
+					addMoveHere(parent);
+					while (stack.length > 1) {
+						addMoveHere(stack.pop());
+					}
+				}
+                
+				// Move group to top
+                if (group.getTitle().indexOf(GROUP_SEPARATOR) != -1) {
+					popup.appendChild($E("menuseparator"));
+                    popup.appendChild($E("menuitem", {
+                        label: "Top",
+                        value: null
+                    }, {
+                        command: onMoveGroups                   
+                    }));
+                }
+				break;
+            }
 		}
 	}	
 
@@ -174,39 +279,193 @@ function processWindow(window) {
 	function onGroupPopupHiding(event) {
 		if (deleteList.length) {
 			let tabs = [];
-			deleteList.forEach(function(index) {
-				tabs.push(gBrowser.tabs[index]);
+			while (deleteList.length) {
+				tabs.push(gBrowser.tabs[deleteList.pop()]);
+			}
+			tabs.forEach(function(tab) {
+				if (tab)
+					gBrowser.removeTab(tab);
 			});
-			tabs.forEach(function(tab) gBrowser.removeTab(tab));
+
+			GU.preventEmptyActiveGroup();
 		}
 	}
 
-	function onTabClick(event) {
-		if (event.button == 1) {
-			// Can't  directly remove tab because then the tabindex would have been changing
-			deleteList.push(event.target.value);
-			// refresh menu
-			let popup = event.target.parentNode;
-			popup.removeChild(event.target);
-			// refresh label
-			let id = popup.getAttribute("id");
-			if (id != GROUPS_POPUP_ID && id != GROUPS_BTNPOPUP_ID) {
-				let menu = popup.parentNode;
-				let title = menu.getAttribute("label");
-				menu.setAttribute("label", title.replace(/^(.*) \((\d+)\)$/, function(str, label, count) { return label + " (" + (parseInt(count, 10) - 1) + ")"; }));
-			}
-			event.stopPropagation();
-		} else if (event.button == 2) {
-			let menuitem = event.target;
-			let cls = menuitem.hasAttribute("class") ? menuitem.getAttribute("class") + " " : "";
-			if (! cls.match(/marked/)) {
-				menuitem.setAttribute("class", cls + "marked");
-			} else {
-				menuitem.setAttribute("class", cls.replace(/\s*\bmarked\b/, ""));
-			}
-			event.stopPropagation();
-		}
+    function onMouseClickMenu(event) {
+        let menu = event.target;
+        if (menu.id == GROUPS_MENU_ID && ! menu.open) {
+            let menubar = menu.parentNode;
+            for (let i = 0, n = menubar.childNodes.length; i < n; i++) {
+                if (menubar.childNodes[i].open) {
+                    menubar.childNodes[i].open = false;
+                }
+            }
+            UI.closePopup();
+            menu.open = true;
+        }
+    }
+    
+    function onMouseOverMenu(event) {
+        onMouseClickMenu(event);
+    }
+
+    function onMouseClickButton(event) {
+        if (event.target.id == TABVIEW_BUTTON_ID) {
+            UI.closePopup();
+            $(BUTTON_POPUP_ID).openPopup(event.target, "after_start", 0, 0, false, false);
+            event.stopPropagation();
+            event.preventDefault();
+        }
+    }
+    
+    function onMouseOverButton(event) {
+        onMouseClickButton(event);
+    }
+
+    // Click = switch to tab
+    // Ctrl + Click = mark tab for multiple selection
+    // Middle click = close button
+    // Right click = show context menu
+	function onTabMenuItemClick(event) {
+        switch (event.button) {
+            case BUTTON_MIDDLE: {
+                // Can't  directly remove tab because then the tabindex would have been changing
+                deleteList.push(event.target.value);
+                
+                let popup = event.target.parentNode;
+                popup.removeChild(event.target);
+
+				event.stopPropagation();
+
+                // The menu labels still showing the wrong tab count at this point (we let it be like that)
+                // The menu labels will be updated after closing the menu
+                break;
+            }
+            case BUTTON_RIGHT: {
+                let context = $(TAB_MENUITEM_CONTEXT_ID);
+                UI.clearPopup(context);
+
+                let selected = UI.getSelectedTabs(event.target);
+                let ntabs = selected.length > 1 ? selected.length + " " : "";
+                let s = selected.length > 1 ? "s" : "";
+                let menu = $E("menu", { label: $F("Move {0}Tab{1}", ntabs, s) });
+                let popup = $E("menupopup");
+
+				let srcGroupId = event.target.getAttribute("groupid");
+                
+                let groups = [];
+                GroupItems.groupItems.forEach(function(gr) {
+					groups.push([gr.id, GU.getTitle(gr)]);
+				});
+                groups.sort(function(a, b) a[1].localeCompare(b[1]));
+
+				let stack = [];
+				let parent = popup;
+				let addMoveHere = function(parent) {
+					parent.appendChild($E("menuseparator"));
+					parent.appendChild($E("menuitem", {
+						label: "Move Here", 
+						value: parent.parentNode.value[0],
+						disabled: parent.parentNode.value[0] == srcGroupId
+					}, { 
+						command: onMoveTabs
+					}));
+				};
+                for (let i = 0, n = groups.length; i < n; ++i) {
+					let level = GU.getLevel(groups[i][1]);
+					let nextLevel = (i < (n-1)) ? GU.getLevel(groups[i+1][1]) : level;
+					//LOG($F("{0} level {1} nextLevel {2}", groups[i][1], level, nextLevel));
+					if (level < nextLevel) {
+						let _menu = $E("menu", { 
+							label: GU.splitTitle(groups[i][1]).name, 
+							value: groups[i] // not a typo, the value is an array
+						});
+						let _popup = $E("menupopup");
+						_menu.appendChild(_popup);
+						parent.appendChild(_menu);
+						stack.push(parent);
+						parent = _popup;
+					} else {
+						parent.appendChild($E("menuitem", {
+							label: GU.splitTitle(groups[i][1]).name,
+							value: groups[i][0],
+							disabled: groups[i][0] == srcGroupId
+						}, {
+							command: onMoveTabs
+						}));
+
+						if (level > nextLevel) {
+							addMoveHere(parent);
+							let diff = level - nextLevel;
+							while (diff-- > 0) {
+								parent = stack.pop();
+								if (diff > 0)
+									addMoveHere(parent);		
+							}
+						}	
+					}
+                }
+				if (stack.length) {
+					addMoveHere(parent);
+					while (stack.length > 1) {
+						addMoveHere(stack.pop());
+					}
+				}
+                
+                menu.appendChild(popup);
+                context.appendChild(menu);
+                context.appendChild($E("menuitem", {
+                    label: $F("Close {0}Tab{1}", ntabs, s),
+                    closemenu: "single" // close the context menu only
+                }, {
+                    command: onCloseTabs
+                }));
+
+				event.stopPropagation(); // prevent reaching the menu (group) click handler
+                break;
+            }
+        }
 	}
+
+	function onCloseTabs(event) {
+		let menuitems = UI.getSelectedTabs(document.popupNode);
+		if (menuitems.length == 0)
+			return;
+		
+		let popup = document.popupNode.parentNode;
+		menuitems.forEach(function(item) {
+			deleteList.push(item.value);
+			popup.removeChild(item);
+		});
+	}
+
+	function onMoveTabs(event) {
+		let menuitems = UI.getSelectedTabs(document.popupNode);
+		if (menuitems.length == 0)
+			return;
+
+		let srcGroup = $T(gBrowser.tabs[menuitems[0].value]).parent;
+		let targetGroupId = event.target.value;
+
+		// LOG("Moving tabs to " + GroupItems.groupItem(targetGroupId).getTitle());
+		// menuitems.forEach(function(item) LOG("Moving " + gBrowser.tabs[item.value].getAttribute("label")));
+		// return;
+	
+		let tabs = [];
+		menuitems.forEach(function(item) tabs.push(gBrowser.tabs[item.value]));
+		tabs.forEach(function(tab) GroupItems.moveTabToGroupItem(tab, targetGroupId));
+		
+		GU.preventEmptyActiveGroup();
+
+		// Reopen menu
+		UI.openPopup(UI.findPopup(document.popupNode), srcGroup, true);
+	}
+
+    function onMoveGroups(event) {
+        let src = GroupItems.groupItem(document.popupNode.value);
+        let dst = GroupItems.groupItem(event.target.value);
+        GU.moveGroup(src, dst);
+    }
 
 	function getGroupsMenuLabel(isTabClose) {
 		isTabClose = isTabClose || false;
@@ -221,17 +480,18 @@ function processWindow(window) {
 						tabCount = "-";
 					} else if (isTabClose)
 						tabCount--; // this event is triggered before the tab is removed
-					title += tabCount;
+					title += typeof(tabCount) == "number" ? (tabCount + " tab" + (tabCount > 1 ? "s" : "")) : tabCount;
 					if (getPref("showGroupCount")) {
-						title += "/";
+						title += ",";
 					}
 				}
 				if (getPref("showGroupCount")) {
+                    title += " ";
 					let groupCount = GU.getNumberOfGroups();
 					if (groupCount == null && groupCount == undefined) {
 						groupCount = "-";
 					}
-					title += groupCount;
+					title += typeof(groupCount) == "number" ? (groupCount + " group" + (groupCount > 1 ? "s" : "")) : groupCount;
 				}
 				title += ")";
 			}
@@ -251,7 +511,7 @@ function processWindow(window) {
 			if (getPref("showTabCount")) {
 				let tabCount = GU.getNumberOfTabsInActiveGroup();
 				if (tabCount) {
-					title += " (" + tabCount + ")";
+					title += " (" + tabCount + (typeof(tabCount) == "number" ? (" tab" + (tabCount > 1 ? "s" : "")) : "") + ")";
 				}
 			}
 		}
@@ -350,7 +610,7 @@ function processWindow(window) {
 		if (type == "menuitem") {
 			let tab = gBrowser.tabs[value];
 			if (tab) {
-				if (getTabItem(tab) && getTabItem(tab).parent == group) {
+				if ($T(tab) && $T(tab).parent == group) {
 					event.stopPropagation();
 					return;
 				}
@@ -393,7 +653,7 @@ function processWindow(window) {
 		if (type == "menuitem") {
 			let tabindex = value;
 			let tab = gBrowser.tabs[tabindex];
-			let tabitem = getTabItem(tab);
+			let tabitem = $T(tab);
 			if (tabitem && tabitem.parent) {
 				// batch move
 				let srcGroup = tabitem.parent;
@@ -412,19 +672,14 @@ function processWindow(window) {
 					queue.push(value);
 				}
 
-				let allTabsMoved = false;
-				if (queue.length == srcGroup.getChildren().length) {
-					// All tabs are moved, prevent panorama from showing up by selecting the first moved tab
-					allTabsMoved = true;
-				}
-
 				let dstGroupId = dstGroup.id;
 				for (let i = 0, len = queue.length; i < len; ++i) {
-					let index = queue[i];
-					GroupItems.moveTabToGroupItem(gBrowser.tabs[index], dstGroupId);
-					if (allTabsMoved && i == 0) {
-						gBrowser.tabContainer.selectedIndex = index;
-					}
+					GroupItems.moveTabToGroupItem(gBrowser.tabs[queue[i]], dstGroupId);
+				}
+
+				if (srcGroup.getChildren().length == queue.length) {
+					// Prevent panorama from opening up when moving all tabs
+					gBrowser.selectedTab = GU.createTabInGroup(dstGroup);
 				}
 			} else {
 				// Moving orphaned tab
@@ -548,7 +803,7 @@ function processWindow(window) {
 		let addedTitles = [];
 		groupItems.forEach(function(group) {
 			let title = group.getTitle();
-			if (! group.hidden && (! prefix || title.indexOf(prefix + GROUP_SEPARATOR) === 0)) {
+			if (! prefix || title.indexOf(prefix + GROUP_SEPARATOR) === 0) {
 				hasGroups = true;
 
 				let displayTitle = title;
@@ -581,9 +836,9 @@ function processWindow(window) {
 				label: GU.getFormattedTitle(GroupItems.groupItem(arr[1]), prefix),
                 alt_label: GU.removePrefix(GroupItems.groupItem(arr[1]).getTitle(), prefix),
 				value: arr[1],
-				"class": arr[2]
+				"class": arr[2],
+				context: GROUP_MENUITEM_CONTEXT_ID
 			});
-			m.setAttribute("context", GROUPS_CONTEXT_ID);
 			// enable drop
 			m.addEventListener("dragenter", onTabDragEnter, false);
 			m.addEventListener("dragover", onTabDragOver, false);
@@ -592,7 +847,7 @@ function processWindow(window) {
 			m.addEventListener("dragstart", onTabDragStart, false);
 
 			// Select tab in group by clicking on the group title
-			m.addEventListener("click", onSelectGroup, true);
+			m.addEventListener("click", onGroupMenuItemClick, false);
 			
 			let mp = $E("menupopup", { id: PREFIX + "group-popup-" + arr[1] });
 			mp.addEventListener("popupshowing", onShowTabsMenu, false);
@@ -610,7 +865,7 @@ function processWindow(window) {
 		let tabs = gBrowser.tabContainer.childNodes;
 		for (let i = 0, len = tabs.length; i < len; i++) {
 			let tab = tabs[i];
-			if (! getTabItem(tab) || getTabItem(tab).parent == null) {
+			if (! $T(tab) || $T(tab).parent == null) {
 				orphanTabs.push([i, tab]);
 			}
 		}
@@ -638,9 +893,8 @@ function processWindow(window) {
 				if ($A(tab, "selected")) {
 					mi.setAttribute("style", "font-weight: bold");
 				}
-				mi.addEventListener("command", onSelectTab, false);
 				mi.addEventListener("dragstart", onTabDragStart, false);
-				mi.addEventListener("click", onTabClick, false);
+				mi.addEventListener("click", onTabMenuItemClick, false);
 				popup.appendChild(mi);
 			});
 		}
@@ -706,7 +960,8 @@ function processWindow(window) {
 		//group.reorderTabItemsBasedOnTabOrder();
 
 		mp.addEventListener("popuphiding", onGroupPopupHiding, false);
-		
+	
+		group.reorderTabItemsBasedOnTabOrder();
 		let children = group.getChildren();
 		if (children.length > 0) {
 			group.getChildren().forEach(function(tabitem) {
@@ -722,33 +977,40 @@ function processWindow(window) {
                     id: PREFIX + "tab-" + tabindex,
                     class: cls,
                     label: $A(tab, "label"),
-                    value: tabindex
+					groupid: gid,
+                    value: tabindex,
+                    closemenu: "none",
+					context: TAB_MENUITEM_CONTEXT_ID
                 });
                 copyattr(mi, tab, "image");
                 copyattr(mi, tab, "busy");
-                mi.addEventListener("command", onSelectTab, false);
                 mi.addEventListener("dragstart", onTabDragStart, false);
-                mi.addEventListener("click", onTabClick, false);
-                mi.addEventListener("contextmenu", (function(event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }), false);
+                mi.addEventListener("click", onTabMenuItemClick, false);
+                mi.addEventListener("command", onSelectTabMenuItem, false);
+                // mi.addEventListener("context", (function(event) {
+                //     event.preventDefault();
+                //     event.stopPropagation();
+                // }), false);
                 mp.appendChild(mi);
 			});
-		} else if (! GU.hasSubgroup(group)) {
-			// Group does not have tab so we add our new tab menu item
-			let mi = $E("menuitem", {
-				label: "Open New Tab",
+		} else {
+            if (GU.hasSubgroup(group)) {
+                mp.appendChild($E("menuseparator"));
+            }
+            mp.appendChild($E("menuitem", {
+                label: "Open New Tab",
 				value: group.id
-			});
-			mp.appendChild(mi);
-			mi.addEventListener("command", onCreateTabInGroup, false);
+            }, {
+                command: onCreateTabInGroup
+            }));
 		}
-        
-        mp.appendChild($E("menuseparator"));
 
-        mp.appendChild($E("menuitem", { label: "Close Group" }, { command: onCloseCurrentGroup }));
-		mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameCurrentGroup }));
+        // Shown only on current group
+        if (mp.id == TABS_POPUP_ID) {
+            mp.appendChild($E("menuseparator"));
+            mp.appendChild($E("menuitem", { label: "Close Group" }, { command: onCloseCurrentGroup }));
+		    mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameCurrentGroup }));
+        }
 	}
 	
     // Adds a menu to the menubar and to the panorama button
@@ -765,8 +1027,8 @@ function processWindow(window) {
 		menu.addEventListener("dragover", onTabDragOver, false);
 		menu.addEventListener("drop", onTabDrop, false);
 		if (getPref('openOnMouseOver')) {
-			menu.addEventListener("mouseover", function(event) this.open = true, true);
-			menu.addEventListener("click", function(event) this.open = true, true);
+			menu.addEventListener("mouseover", onMouseOverMenu, true);
+			menu.addEventListener("click", onMouseOverMenu, true);
 		}
 		menubar.insertBefore(menu, menubar.lastChild);
 		
@@ -833,14 +1095,12 @@ function processWindow(window) {
 				}
 				
 				if (getPref("replacePanoramaButton")) {
-					listen(window, tabviewButton, "click", function(event) {
-						if (event.target == tabviewButton) {
-							btnPopup.openPopup(tabviewButton, "after_start", 0, 0, false, false);
-							event.stopPropagation();
-							event.preventDefault();
-						}
-					}, true);
+					listen(window, tabviewButton, "click", onMouseClickButton, true);
 				}
+
+                if (getPref('openOnMouseOver')) {
+                    listen(window, tabviewButton, "mouseover", onMouseOverButton, true);
+                }
 			}
 		}
 
@@ -861,19 +1121,30 @@ function processWindow(window) {
      * Create a context menu that will be displayed on right click on the menubar menu
      */
 	function createContextMenu() {
-		let context = $EL("menupopup", [
+        let popupset = $("mainPopupSet");
+        
+        // Group menuitem context menu
+		
+		let groupContext = $EL("menupopup", [
 			$E("menuitem", { label: "Close Group" }, { command: onCloseGroup }),
 			$E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameGroup }),
+            $EL("menu", [ $E("menupopup") ], { label: "Move Group To\u2026" }),
 			$E("menuseparator"),
 			$E("menuitem", { label: "New Tab" }, { command: onOpenNewTab }),
-			$E("menuseparator"),
 			$E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup })
 		], {
-            id: GROUPS_CONTEXT_ID
+            id: GROUP_MENUITEM_CONTEXT_ID
         });
-		$("mainPopupSet").appendChild(context);
+		popupset.appendChild(groupContext);
 
-		return function() $("mainPopupSet").removeChild(context);
+        // Tab menuitem context menu
+        let tabContext = $E("menupopup", { id: TAB_MENUITEM_CONTEXT_ID });
+        popupset.appendChild(tabContext);
+
+		return function() {
+            popupset.removeChild(groupContext);
+            popupset.removeChild(tabContext);
+        }
 	}
 	
 	unload(createGroupsMenu(), window);
@@ -891,7 +1162,6 @@ function startup(data, reason) {
 	AddonManager.getAddonByID(data.id, function(addon) {
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/moz-utils.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/my-utils.js").spec, global);
-		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/tab.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/debug.js").spec, global);
 		Services.scriptloader.loadSubScript(addon.getResourceURI("libs/prefs.js").spec, global);
 
@@ -936,7 +1206,7 @@ function startup(data, reason) {
 				styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 		});
 		
-		watchWindows(processWindow);
+		watchWindows(processWindow, "navigator:browser");
 	});
 }
 

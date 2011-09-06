@@ -18,9 +18,10 @@ function $A(el, attr, def) {
 }
 
 function isUnloaded(tab) {
-    return tab.getAttribute("ontap") || // bartab
-           tab.linkedBrowser.userTypedValue != null;
+    return tab.linkedBrowser.userTypedValue != null;
 }
+
+function $T(tab) tab._tabViewTabItem;
 
 /**
  * General utility functions
@@ -65,10 +66,21 @@ function createGeneralFuncs(window) {
 		return el;
 	}
 
+    // string format
+    function $F() {
+        let args = arguments; // an object
+        let str = args["0"];
+        let narg = args.length;
+        return str.replace(/{(\d)}/g, function(match, i) {
+            return i <= narg ? args[parseInt(i, 10)+1+""] : "{" + i + "}";
+        });
+    }
+
     return {
         $: $,
         $E: $E,
-        $EL: $EL
+        $EL: $EL,
+        $F: $F
     };
 }
 
@@ -102,12 +114,19 @@ function createGroupFuncs(window) {
     GU.removePrefix = function GU_removePrefix(title, prefix) {
         return prefix ? title.substr(prefix.length + GROUP_SEPARATOR.length) : title;
     };
+
+    // getTitle which handles group without title
+    GU.getTitle = function GU_getTitle(group) {
+        if (typeof(group) == "string")
+            return group;
+        let title = group.getTitle();
+        if (! title)
+            title = "(Anonymous: " + group.id + ")";
+        return title;
+    };
     
     GU.getFormattedTitle = function GU_getFormattedTitle(group, prefix) {
-        let title = group.getTitle();
-        if (! title) {
-            title = group.id;
-        }
+        let title = GU.getTitle(group);
         if (prefix) {
             title = GU.removePrefix(title, prefix);
         }
@@ -155,7 +174,7 @@ function createGroupFuncs(window) {
 
     GU.createTabInGroup = function GU_createTabInGroup(group) {
 		GroupItems.setActiveGroupItem(group);
-		gBrowser.loadOneTab("about:blank", { inBackground: false });
+		return gBrowser.loadOneTab("about:blank", { inBackground: false });
     };
 
     GU.selectGroup = function GU_selectGroup(group) {
@@ -167,6 +186,10 @@ function createGroupFuncs(window) {
 		if (! tabItem) {
 			tabItem = group.getChild(0);
 		}
+        if (! tabItem) {
+            GU.createTabInGroup(group);
+            tabItem = group.getChild(0);
+        }
 		if (tabItem) {
 			gBrowser.selectedTab = tabItem.tab;
 			GroupItems.setActiveGroupItem(group);
@@ -254,7 +277,33 @@ function createGroupFuncs(window) {
     };
 
     GU.isChild = function GU_isChild(childGroup, parentGroup) {
-        return childGroup.getTitle().indexOf(parentGroup.getTitle() + GROUP_SEPARATOR) === 0;
+        return GU.getTitle(childGroup).indexOf(GU.getTitle(parentGroup) + GROUP_SEPARATOR) === 0;
+    };
+
+    GU.isParent = function GU_isParent(group, parent) {
+        let title = GU.getTitle(group);
+        let parentTitle = GU.getTitle(parent);
+        let rpos = title.lastIndexOf(GROUP_SEPARATOR);
+        if (rpos == -1)
+            return (parent == null || parent == undefined) ? true : false;
+        if (parent == null || parent == undefined)
+            return false;
+        return title.substr(0, rpos) == parentTitle;
+    };
+
+    GU.getLevel = function GU_getLevel(title) {
+        if (typeof(title) == "object") {
+            title = title.getTitle();
+        }
+        let level = 0;
+        let pos = -1;
+        while (1) {
+            pos = title.indexOf(GROUP_SEPARATOR, pos + 1);
+            if (pos == -1)
+                break
+            ++level;
+        }
+        return level;
     };
 
     GU.hasSubgroup = function GU_hasSubgroup(group) {
@@ -268,8 +317,9 @@ function createGroupFuncs(window) {
     GU.getNumberOfGroups = function GU_getNumberOfGroups() {
         let el = document.getElementById("tabviewGroupsNumber");
         if (el) {
-            return el.getAttribute("groups");
+            return parseInt(el.getAttribute("groups"), 10);
         }
+        return null;
     };
 
     GU.getNumberOfTabsInActiveGroup = function GU_getNumberOfTabsInActiveGroup() {
@@ -278,6 +328,20 @@ function createGroupFuncs(window) {
             return group.getChildren().length;
         }
     };
+
+    GU.preventEmptyActiveGroup = function UI_preventEmptyActiveGroup() {
+        let group = GroupItems.getActiveGroupItem();
+        if (group && group.getChildren().length == 0)
+            gBrowser.selectedTab = GU.createTabInGroup(group);
+    };
+
+    GU.canMove = function GU_canMove(srcGroup, dstGroup) {
+        let srcTitle = GU.getTitle(srcGroup);
+        let dstTitle = GU.getTitle(dstGroup);
+        return srcTitle != dstTitle &&
+               ! GU.isChild(dstTitle, srcTitle) &&
+               ! GU.isParent(srcTitle, dstTitle);
+    }
 
     return GU;
 }
@@ -360,6 +424,9 @@ function createUIFuncs(window) {
     };
 
     UI.openPopup = function UI_openPopup(popup, group, openGroup) {
+        if (! popup)
+            return;
+        
         UI.clearPopup(popup);
         if (popup.id == GROUPS_POPUP_ID) {
             $(GROUPS_MENU_ID).open = false;
@@ -433,6 +500,34 @@ function createUIFuncs(window) {
         return null;
     };
 
+    UI.isTabSelected = function UI_isTabSelected(menuitem) {
+        return menuitem.hasAttribute("class") && menuitem.getAttribute("class").match(/marked/);
+    };
+
+    UI.isMultipleTabSelected = function UI_isMultipleTabSelected(menuitem) {
+        let menu = menuitem.parentContainer;
+        for (let i = 0, n = menu.itemCount; i < n; ++i) {
+            let item = menu.getItemAtIndex(i);
+            if (item.tagName == "menuitem" && item != menuitem && UI.isTabSelected(item)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    UI.getSelectedTabs = function UI_getSelectedTabs(menuitem) {
+        let tabs = [menuitem];
+        let menu = menuitem.parentContainer;
+        for (let i = 0, n = menu.itemCount; i < n; ++i) {
+            let item = menu.getItemAtIndex(i);
+            if (item !== menuitem && UI.isTabSelected(item)) {
+                tabs.push(item);
+            }
+        }
+        //LOG("Selected tabs are:\n" + tabs.map(function(v) v.getAttribute("label")).join("\n"));
+        return tabs;
+    };
+    
     return UI;
 }
 
