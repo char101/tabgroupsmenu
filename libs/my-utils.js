@@ -159,6 +159,8 @@ function createGroupFuncs(window) {
             newGroup.newTab();
             let newitem = newGroup.getChild(0);
             gBrowser.selectedTab = newitem.tab;
+            let urlbar = $("urlbar");
+            if (urlbar) urlbar.focus();
         }
         return newGroup;
     };
