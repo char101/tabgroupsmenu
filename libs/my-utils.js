@@ -172,10 +172,10 @@ function createGroupFuncs(window) {
         return group;
     };
 
-    GU.createTabInGroup = function GU_createTabInGroup(group) {
+    GU.createTabInGroup = function GU_createTabInGroup(group, onlyWhenEmpty) {
         // In newer version this automatically creates a new tab
 		GroupItems.setActiveGroupItem(group);
-        if (group.getChildren().length == 0) {
+        if (! onlyWhenEmpty || group.getChildren().length == 0) {
 		    return gBrowser.loadOneTab("about:blank", { inBackground: false });
         }
     };

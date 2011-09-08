@@ -109,9 +109,12 @@ function processWindow(window) {
         GU.bookmarkGroup(group);
     }
     
+    // Triggered by "Open New Tab" menuitem in empty group
 	function onCreateTabInGroup(event) {
 		let group = GU.findGroup(event.target.value);
-		GU.createTabInGroup(group);
+		GU.createTabInGroup(group, true);
+        let urlbar = $("urlbar");
+        if (urlbar) urlbar.focus();
 	}
 
 	// Todo: select unloaded tab
@@ -280,12 +283,13 @@ function processWindow(window) {
 		}
 	}	
 
+    // Triggered by "New Tab" menuitem in group context menu
 	function onOpenNewTab(event) {
-		let menu = document.popupNode;
-		let gid = menu.value;
-		let group = GroupItems.groupItem(gid);
-		GroupItems.setActiveGroupItem(group);
-		let newTab = gBrowser.loadOneTab("about:blank", {inBackground: false});
+        LOG("openNewTab");
+		let group = GroupItems.groupItem(document.popupNode.value);
+        GU.createTabInGroup(group);
+        let urlbar = $("urlbar");
+        if (urlbar) urlbar.focus();
 	}	
 
 	function onGroupPopupShowing(event) {
