@@ -44,6 +44,7 @@ const PREFS = {
   useCurrentGroupNameInTabsMenu: false,
   showTabCount: true,
   showGroupCount: true,
+  keepMenuOpen: false,
   newPrefs: ""
 };
 

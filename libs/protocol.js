@@ -58,7 +58,6 @@ let Protocol = function Protocol() {
             } else {
                 uri = ios.newURI("jar:" + ios.newFileURI(installPath).spec + "!" + "/chrome" + uri.path, null, null);
             }
-            LOG(uri.spec);
             let channel = ios.newChannelFromURI(uri);
             channel.originalURI = uri;
             channel.owner = Cc["@mozilla.org/systemprincipal;1"].createInstance(Ci.nsIPrincipal);

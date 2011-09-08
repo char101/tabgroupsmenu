@@ -116,8 +116,16 @@ function createGroupFuncs(window) {
             title = "(Anonymous: " + group.id + ")";
         return title;
     };
+
+    GU.getBasename = function GU_getBasename(group) {
+        let title = typeof(group) == "string" ? group : group.getTitle();
+        let pos = title.lastIndexOf(GROUP_SEPARATOR);
+        if (pos != -1)
+            title = title.substr(pos + GROUP_SEPARATOR.length);
+        return title;
+    };
     
-    GU.getFormattedTitle = function GU_getFormattedTitle(group, prefix) {
+    GU.getMenuLabel = function GU_getFormattedTitle(group, prefix) {
         let title = GU.getTitle(group);
         if (prefix) {
             title = GU.removePrefix(title, prefix);
@@ -349,8 +357,8 @@ function createGroupFuncs(window) {
             let browser = gBrowser.getBrowserForTab(tab);
             let uri = null;
             if (browser) {
-                if (browser.uri)
-                    uri = browser.uri;
+                if (browser.currentURI)
+                    uri = browser.currentURI.spec;
                 if (browser.userTypedValue)
                     uri = browser.userTypedValue;
             }
@@ -407,18 +415,19 @@ function createWindowFuncs(window) {
         return gBrowser.tabs.length;  
     };
 
-    WU.getTabURL = function WU_getTabURL(tab) {
+    WU.getTabURL = function WU_getTabURL(tab, defaultValue) {
         let browser = gBrowser.getBrowserForTab(tab);
         if (browser) {
-            if (browser.uri)
-                return browser.uri.spec;
+            if (browser.currentURI)
+                return browser.currentURI.spec;
             if (browser.userTypedValue)
                 return browser.userTypedValue;
         }
+        return defaultValue;
     };
 
     WU.isUnloaded = function WU_isUnloaded(tab) {
-        return tab.linkedBrowser.userTypedValue != null;
+        return !tab.currentURI && tab.linkedBrowser.userTypedValue != null;
     };
 
     return WU;

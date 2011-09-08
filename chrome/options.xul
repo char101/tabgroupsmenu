@@ -40,6 +40,7 @@
 		<checkbox label="Use current group name as Tabs menu label" id="opt-useCurrentGroupNameInTabsMenu"/>
 		<checkbox label="Show tabs count" tooltiptext="Show the number of tabs besides the menu label" id="opt-showTabCount"/>
 		<checkbox label="Show groups count" tooltiptext="Show the number of groups besides the menu label" id="opt-showGroupCount"/>
+		<checkbox label="Keep menu open after operation (moving group/tab, closing group/tab)" id="opt-keepMenuOpen"/>
 	</groupbox>
 	
   <groupbox>

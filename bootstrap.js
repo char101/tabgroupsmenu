@@ -128,7 +128,8 @@ function processWindow(window) {
 		}
 
 		// Reopen menu
-		UI.openPopup(popup, title);
+		if (getPref("keepMenuOpen"))
+            UI.openPopup(popup, title);
 	}
 
 	function onCloseCurrentGroup(event) {
@@ -161,7 +162,8 @@ function processWindow(window) {
 			}
 		}
 		// Reopen menu
-		UI.openPopup(popup, group);
+        if (getPref("keepMenuOpen"))
+		    UI.openPopup(popup, group);
 	}
 
 	function onRenameCurrentGroup(event) {
@@ -216,7 +218,7 @@ function processWindow(window) {
 					parent.appendChild($E("menuitem", {
 						label: "Move Here", 
 						value: parent.parentNode.value[0],
-						disabled: GU.canMove(srcTitle, parent.parentNode.value[1])
+						disabled: ! GU.canMove(srcTitle, parent.parentNode.value[1])
 					}, { 
 						command: onMoveGroups 
 					}));
@@ -228,7 +230,7 @@ function processWindow(window) {
 					if (level < nextLevel) {
 						let _menu = $E("menu", {
 							label: GU.splitTitle(groups[i][1]).name, 
-							value: groups[i] // now a typo, the value is an array
+							value: groups[i] // value type is an array
 						});
 						let _popup = $E("menupopup");
 						_menu.appendChild(_popup);
@@ -239,7 +241,7 @@ function processWindow(window) {
 						parent.appendChild($E("menuitem", {
 							label: GU.splitTitle(groups[i][1]).name,
 							value: groups[i][0],
-							disabled: GU.canMove(srcTitle, groups[i][1])
+							disabled: ! GU.canMove(srcTitle, groups[i][1])
 						}, {
 							command: onMoveGroups			
 						}));
@@ -272,7 +274,8 @@ function processWindow(window) {
                         command: onMoveGroups                   
                     }));
                 }
-				break;
+				
+                break;
             }
 		}
 	}	
@@ -306,7 +309,7 @@ function processWindow(window) {
 
     function onMouseClickMenu(event) {
         let menu = event.target;
-        if (menu.id == GROUPS_MENU_ID && ! menu.open) {
+        if ((menu.id == GROUPS_MENU_ID || menu.id == TABS_MENU_ID) && ! menu.open) {
             let menubar = menu.parentNode;
             for (let i = 0, n = menubar.childNodes.length; i < n; i++) {
                 if (menubar.childNodes[i].open) {
@@ -361,7 +364,7 @@ function processWindow(window) {
                 let selected = UI.getSelectedTabs(event.target);
                 let ntabs = selected.length > 1 ? selected.length + " " : "";
                 let s = selected.length > 1 ? "s" : "";
-                let menu = $E("menu", { label: $F("Move {0}Tab{1}", ntabs, s) });
+                let menu = $E("menu", { label: $F("Move {0}to Group", (ntabs > 1 ? (ntabs + " Tabs ") : "")) });
                 let popup = $E("menupopup");
 
 				let srcGroupId = event.target.getAttribute("groupid");
@@ -457,7 +460,8 @@ function processWindow(window) {
 		if (menuitems.length == 0)
 			return;
 
-		let srcGroup = $T(gBrowser.tabs[menuitems[0].value]).parent;
+        let tabitem = $T(gBrowser.tabs[menuitems[0].value]);
+		let srcGroup = tabitem ? tabitem.parent : null;
 		let targetGroupId = event.target.value;
 
 		// LOG("Moving tabs to " + GroupItems.groupItem(targetGroupId).getTitle());
@@ -466,12 +470,19 @@ function processWindow(window) {
 	
 		let tabs = [];
 		menuitems.forEach(function(item) tabs.push(gBrowser.tabs[item.value]));
-		tabs.forEach(function(tab) GroupItems.moveTabToGroupItem(tab, targetGroupId));
+		tabs.forEach(function(tab) {
+            if (tab.pinned) {
+                // unpin tab first
+                gBrowser.unpinTab(tab);
+            }
+            GroupItems.moveTabToGroupItem(tab, targetGroupId);
+        });
 		
 		GU.preventEmptyActiveGroup();
 
 		// Reopen menu
-		UI.openPopup(UI.findPopup(document.popupNode), srcGroup, true);
+		if (getPref("keepMenuOpen"))
+            UI.openPopup(UI.findPopup(document.popupNode), srcGroup, true);
 	}
 
     function onMoveGroups(event) {
@@ -722,9 +733,10 @@ function processWindow(window) {
 				target = target.parentNode;
 			}
 		}
-		if (popup) {
+		
+        // Reopen menu
+        if (getPref("keepMenuOpen") && popup)
 			UI.openPopup(popup, dstGroup);
-		}
 		
 		event.stopPropagation();
 	}
@@ -738,7 +750,8 @@ function processWindow(window) {
 			    prefs[key] = getPref(key);
             }
 		}
-		let dialog = window.openDialog(getChromeURI("options.xul"), "Preferences", "chrome,centerscreen", prefs);
+        // modal required for synchronous execution
+		let dialog = window.openDialog(getChromeURI("options.xul"), "Preferences", "chrome,centerscreen,modal", prefs);
 		let changedPrefs = {};
 		for (let key in prefs) {
 			if (getPref(key) != prefs[key]) {
@@ -841,10 +854,10 @@ function processWindow(window) {
 		});
 		groupTitles.sort(function(a, b) a[0].localeCompare(b[0]));
 		groupTitles.forEach(function(arr) {
+            let group = GroupItems.groupItem(arr[1]);
 			let m = $E("menu", {
 				id: PREFIX + "group-" + arr[1],
-				label: GU.getFormattedTitle(GroupItems.groupItem(arr[1]), prefix),
-                alt_label: GU.removePrefix(GroupItems.groupItem(arr[1]).getTitle(), prefix),
+				label: GU.getMenuLabel(group, prefix),
 				value: arr[1],
 				"class": arr[2],
 				context: GROUP_MENUITEM_CONTEXT_ID
@@ -880,9 +893,8 @@ function processWindow(window) {
 			}
 		}
 		if (orphanTabs.length) {
-			if (hasGroups) {
+			if (hasGroups)
 				popup.appendChild($E("menuseparator"));
-			}
 			orphanTabs.forEach(function(arr) {
 				let index = arr[0];
 				let tab = arr[1];
@@ -892,11 +904,16 @@ function processWindow(window) {
 				} else if (WU.isUnloaded(tab)) {
 					cls += " unloaded";
 				}
+                let taburl = WU.getTabURL(tab);
+                // using description will cut the menuitem label so use tooltiptext instead
 				let mi = $E("menuitem", {
 					id: PREFIX + "tab-" + index,
 					value: index,
 					"class": cls,
-					label: $A(tab, "label")
+					label: tab.getAttribute("label"),
+                    tooltiptext: taburl,
+                    closemenu: "none",
+                    context: TAB_MENUITEM_CONTEXT_ID,
 				});
 				copyattr(mi, tab, "image");
 				copyattr(mi, tab, "busy");
@@ -905,6 +922,7 @@ function processWindow(window) {
 				}
 				mi.addEventListener("dragstart", onTabDragStart, false);
 				mi.addEventListener("click", onTabMenuItemClick, false);
+                mi.addEventListener("command", onSelectTabMenuItem, false);
 				popup.appendChild(mi);
 			});
 		}
@@ -953,8 +971,9 @@ function processWindow(window) {
 			return;
 		}
 
-		showGroupsMenu(popup, gid);
-		showTabsMenu(popup, gid);
+        UI.clearPopup(popup);
+		showGroupsMenu(popup, gid); // show subgroups
+		showTabsMenu(popup, gid); // show the tabs
 
 		onGroupPopupShowing(event);
 		
@@ -983,10 +1002,13 @@ function processWindow(window) {
                     cls += " unloaded";
                 }
                 let tabindex = tabs.getIndexOfItem(tab);
+                let taburl = WU.getTabURL(tab, null);
+                // using description will cuts the menuitem label so use tooltiptext instead
                 let mi = $E("menuitem", {
                     id: PREFIX + "tab-" + tabindex,
                     class: cls,
                     label: tab.getAttribute("label"),
+                    tooltiptext: taburl,
 					groupid: gid,
                     value: tabindex,
                     closemenu: "none",
@@ -997,10 +1019,6 @@ function processWindow(window) {
                 mi.addEventListener("dragstart", onTabDragStart, false);
                 mi.addEventListener("click", onTabMenuItemClick, false);
                 mi.addEventListener("command", onSelectTabMenuItem, false);
-                // mi.addEventListener("context", (function(event) {
-                //     event.preventDefault();
-                //     event.stopPropagation();
-                // }), false);
                 mp.appendChild(mi);
 			});
 		} else {
@@ -1068,6 +1086,11 @@ function processWindow(window) {
 			menu.setAttribute("accesskey", "a");
 		}
         menubar.insertBefore(menu, menubar.lastChild);
+        
+        if (getPref('openOnMouseOver')) {
+            menu.addEventListener("mouseover", onMouseOverMenu, true);
+            menu.addEventListener("click", onMouseOverMenu, true);
+        }
 
         let popup = $E("menupopup", {
             id: TABS_POPUP_ID,

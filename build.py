@@ -21,10 +21,10 @@ str = open('install.rdf', 'rb').read()
 str = ver_re.sub('<version>%s</version>' % version, str)
 open('install.rdf', 'wb').write(str)
 
-for file in glob.glob('../tabgroupsmenu@char.cc-*.xpi'):
+for file in glob.glob('../tabgroupsmenu-*.xpi'):
     os.unlink(file)
 
-zf = zipfile.ZipFile("../tabgroupsmenu@char.cc-%s%s.xpi" % (version, '-debug' if is_debug else ''), 'w', zipfile.ZIP_DEFLATED)
+zf = zipfile.ZipFile("../tabgroupsmenu-%s%s.xpi" % (version, '-debug' if is_debug else ''), 'w', zipfile.ZIP_DEFLATED)
 
 zf.write('bootstrap.js')
 zf.write('install.rdf')
