@@ -829,7 +829,7 @@ function processWindow(window) {
 		let groupTitles = [];
 		let addedTitles = [];
 		groupItems.forEach(function(group) {
-			let title = group.getTitle();
+			let title = GU.getTitle(group);
 			if (! prefix || title.indexOf(prefix + GROUP_SEPARATOR) === 0) {
 				hasGroups = true;
 
@@ -856,7 +856,6 @@ function processWindow(window) {
 				}
 			}
 		});
-		groupTitles.sort(function(a, b) a[0].localeCompare(b[0]));
 		groupTitles.forEach(function(arr) {
             let group = GroupItems.groupItem(arr[1]);
 			let m = $E("menu", {
