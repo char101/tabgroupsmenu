@@ -503,10 +503,12 @@ function createUIFuncs(window) {
     };
 
 	UI.currentPopup = function UI_currentPopup() {
-		if ($(GROUPS_MENU_ID).open) {
+        let groupsMenu = $(GROUPS_MENU_ID);
+		if (groupsMenu && groupsMenu.open) {
 			return $(GROUPS_POPUP_ID);
 		}
-        if ($(TABS_MENU_ID).open) {
+        let tabsMenu = $(TABS_MENU_ID);
+        if (tabsMenu && tabsMenu.open) {
             return $(TABS_POPUP_ID);
         }
 		let popup = $(BUTTON_POPUP_ID);

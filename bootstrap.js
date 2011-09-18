@@ -1078,7 +1078,7 @@ function processWindow(window) {
     // A menu in the menubar "GroupTabs" showing the list of tabs in the current group
     function createTabsMenu() {
         if (! getPref("showTabsMenu"))
-            return;
+            return function() {}; // must always return a callback because it's feed into unload
         
         let menubar = $("main-menubar");
         let menu = $E("menu", {
