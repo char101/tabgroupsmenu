@@ -549,16 +549,17 @@ function processWindow(window) {
 	// Called when switching tab
 	function onTabSelectHandler(event) {
         if (GroupItems) {
-            if (getPref("useCurrentGroupNameInTabsMenu") || getPref("showTabCount")) {
+            let tabMenu = $(TABS_MENU_ID);
+            if (tabMenu && getPref("useCurrentGroupNameInTabsMenu") || getPref("showTabCount")) {
                 let group = GroupItems.getActiveGroupItem();
                 if (group) {
-                    let lastGroupId = $(TABS_MENU_ID).getAttribute("groupid");
+                    let lastGroupId = tabMenu.getAttribute("groupid");
                     if (group.id == lastGroupId) {
                         return;
                     }
-                    $(TABS_MENU_ID).setAttribute("groupid", group.id);
+                    tabMenu.setAttribute("groupid", group.id);
                 }
-                $(TABS_MENU_ID).setAttribute("label", getTabsMenuLabel());
+                tabMenu.setAttribute("label", getTabsMenuLabel());
             }
         }
 	}
@@ -597,18 +598,24 @@ function processWindow(window) {
 		let target = event.target; // could be a menuitem (tab) or menu (group)
 		let canMove = true;
 		if (target.tagName == "menuitem") {
+            // Dragging a tab menu item
 			let tab = gBrowser.tabs[target.value];
-			if (! tab || tab.pinned) canMove = false;
-		}
+			if (! tab || tab.pinned)
+                canMove = false;
+		} else {
+            // Dragging a menu i.e. a group
+            let group = GroupItems.groupItem(event.target.value);
+            if (group.getTitle() == "") {
+                WU.alert("Cannot Drag Anonymous Group", "Please set a title first for the group before dragging it.");
+                canMove = false;
+            }
+        }
 		if (canMove) {
 			let dt = event.dataTransfer;
 			dt.effectAllowed = "move";
 			dt.dropEffect = "move";
 			dt.mozSetDataAt("plain/text", target.value, 0); // value
 			dt.mozSetDataAt("plain/text", target.tagName, 1); // type
-			//dt.mozSetDataAt("plain/text", event.clientX, 1);
-			//dt.mozSetDataAt("plain/text", event.clientY, 2);
-		
 			event.stopPropagation();
 		} else {
 			event.preventDefault();
@@ -846,12 +853,10 @@ function processWindow(window) {
 				if (addedTitles.indexOf(displayTitle) == -1) {
 					addedTitles.push(displayTitle);
 				
-					group = GU.createIfNotExists(prefix ? (prefix + GROUP_SEPARATOR + displayTitle) : displayTitle);
-
 					let cls = "menu-iconic tabgroup";
 					if (activeGroup) {
 						let pathPrefix = prefix ? prefix + GROUP_SEPARATOR + displayTitle : displayTitle;
-						let activeTitle = activeGroup.getTitle();
+						let activeTitle = GU.getTitle(activeGroup);
 						if (activeTitle === pathPrefix || activeTitle.indexOf(pathPrefix + GROUP_SEPARATOR) === 0) {
 							cls += " current";
 						}
