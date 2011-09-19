@@ -565,10 +565,14 @@ function processWindow(window) {
 
 	function updateMenuLabels(isTabClose) {
 		if (getPref("showTabCount") || getPref("showGroupCount")) {
-			$(GROUPS_MENU_ID).setAttribute("label", getGroupsMenuLabel(isTabClose));
+            let groupsMenu = $(GROUPS_MENU_ID);
+            if (groupsMenu)
+			    groupsMenu.setAttribute("label", getGroupsMenuLabel(isTabClose));
 		}
 		if (getPref("showTabCount")) {
-			$(TABS_MENU_ID).setAttribute("label", getTabsMenuLabel());
+            let tabsMenu = $(TABS_MENU_ID);
+			if (tabsMenu)
+                tabsMenu.setAttribute("label", getTabsMenuLabel());
 		}
 	}
 
