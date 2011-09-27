@@ -468,13 +468,20 @@ function createUIFuncs(window) {
     };
 
     UI.openPopup = function UI_openPopup(popup, group, openGroup) {
-        if (! popup)
-            return;
-        
+        if (! popup) return;        
         UI.clearPopup(popup);
         if (popup.id == GROUPS_POPUP_ID) {
-            $(GROUPS_MENU_ID).open = false;
-            $(GROUPS_MENU_ID).open = true;
+            let menu = $(GROUPS_POPUP_ID);
+            if (menu) {
+                if (menu.open) menu.open = false;
+                menu.open = true;
+            }
+        } else if (popup.id == TABS_POPUP_ID) {
+            let menu = $(TABS_MENU_ID);
+            if (menu) {
+                if (menu.open) menu.open = false;
+                menu.open = true;
+            }
         } else {
             popup.hidePopup();
             popup.openPopup($(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);

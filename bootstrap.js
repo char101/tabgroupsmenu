@@ -88,8 +88,21 @@ function processWindow(window) {
 	}
 
 	function onCreateSubGroup(event) {
-		let group = GU.findGroup(document.popupNode.value);
+        let group = null;
+        if (document.popupNode) {
+            // Called from context menu
+            group = GU.findGroup(document.popupNode.value);
+        } else {
+            group = GroupItems.getActiveGroupItem();
+        }
+		if (! group) {
+            return;
+        }
 		let title = group.getTitle();
+        if (! title) {
+            // Don't create a subgroup of anonymous group
+            return;
+        }
 		let [ret, name, openInBg] = WU.promptCheck("Create Subgroup of " + title, "Enter group title:", "", "Open in background");
 		if (ret && name != null && name.length) {
 			name = name.trim();
@@ -146,12 +159,18 @@ function processWindow(window) {
 	}
 
 	function onRenameGroup(event) {
-        let popup = UI.findPopup(document.popupNode);
-		let group = GroupItems.groupItem(document.popupNode.value);
+        let group = null;
+        if (document.popupNode) {
+            // Called from context menu
+            group = GroupItems.groupItem(document.popupNode.value);
+        } else {
+            group = GroupItems.getActiveGroupItem();
+        }
+        if (! group) return;
 		let title = group.getTitle();
 		let parts = title.split(GROUP_SEPARATOR);
 		let oldname = parts.pop();
-		let newname = WU.prompt("Rename Group (" + title + ")", "New group name: ", oldname);
+		let newname = WU.prompt("Rename Group (" + GU.getTitle(group) + ")", "New group name: ", oldname);
 		if (newname) {
 			newname = newname.trim();
 			if (newname && newname != oldname) {
@@ -165,30 +184,10 @@ function processWindow(window) {
 			}
 		}
 		// Reopen menu
-        if (getPref("keepMenuOpen"))
+        if (getPref("keepMenuOpen")) {
+            let popup = UI.findPopup(document.popupNode || event.target);
 		    UI.openPopup(popup, group);
-	}
-
-	function onRenameCurrentGroup(event) {
-		let group = GroupItems.getActiveGroupItem();
-		if (group) {
-			let title = group.getTitle();
-			let parts = title.split(GROUP_SEPARATOR);
-			let oldname = parts.pop();
-			let newname = WU.prompt("Rename Group (" + title + ")", "New group name: ", oldname);
-			if (newname) {
-				newname = newname.trim();
-				if (newname && newname != oldname) {
-					let fullname = parts.length > 0 ? parts.join(GROUP_SEPARATOR) + GROUP_SEPARATOR + newname : newname;
-					if (GroupItems.groupItems.some(function(group) group.getTitle() == fullname)) {
-						WU.alert("Failed to rename group", "Group with title \"" + newname + "\" already exists.");
-						return;
-					}
-					GU.renameGroup(group, newname);
-					updateMenuLabels();
-				}
-			}
-		}
+        }
 	}
 
 	function onGroupMenuItemClick(event) {
@@ -533,7 +532,7 @@ function processWindow(window) {
 			if (getPref("useCurrentGroupNameInTabsMenu")) {
 				let group = GroupItems.getActiveGroupItem();
 				if (group) {
-					title = group.getTitle();
+					title = GU.getTitle(group);
 				}
 			}
 			if (getPref("showTabCount")) {
@@ -1049,7 +1048,11 @@ function processWindow(window) {
         if (mp.id == TABS_POPUP_ID) {
             mp.appendChild($E("menuseparator"));
             mp.appendChild($E("menuitem", { label: "Close Group" }, { command: onCloseCurrentGroup }));
-		    mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameCurrentGroup }));
+		    mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameGroup }));
+            if (group.getTitle() != "") {
+                // Don't create a subgroup from anonymous group
+                mp.appendChild($E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup }));
+            }
         }
 	}
 	
