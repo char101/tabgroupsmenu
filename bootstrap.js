@@ -190,6 +190,10 @@ function processWindow(window) {
         }
 	}
 
+    function onSelectGroupByName(event) {
+        GU.selectGroup(event.target.value);
+    }
+    
 	function onGroupMenuItemClick(event) {
 		switch (event.button) {
 			case BUTTON_LEFT: {
@@ -1049,9 +1053,23 @@ function processWindow(window) {
             mp.appendChild($E("menuseparator"));
             mp.appendChild($E("menuitem", { label: "Close Group" }, { command: onCloseCurrentGroup }));
 		    mp.appendChild($E("menuitem", { label: "Rename Group\u2026" }, { command: onRenameGroup }));
-            if (group.getTitle() != "") {
+
+            let title = group.getTitle();
+            if (title != "") {
                 // Don't create a subgroup from anonymous group
                 mp.appendChild($E("menuitem", { label: "New Subgroup\u2026" }, { command: onCreateSubGroup }));
+
+                // Menu items of parent groups
+                let parts = title.split(GROUP_SEPARATOR);
+                parts.pop();
+                if (parts.length > 0) {
+                    mp.appendChild($E("menuseparator"));
+                    while (parts.length > 0) {
+                        let tempTitle = parts.join(GROUP_SEPARATOR);
+                        mp.appendChild($E("menuitem", { label: tempTitle, value: GU.findGroup(tempTitle) }, { command: onSelectGroupByName }));
+                        parts.pop();
+                    }
+                }
             }
         }
 	}
