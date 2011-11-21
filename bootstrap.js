@@ -210,6 +210,9 @@ function processWindow(window) {
                 let groups = [];
                 let gid = event.target.value;
                 let group = GroupItems.groupItem(gid);
+                if (! group) {
+                    return;
+                }
 				let srcTitle = group.getTitle();
                 GroupItems.groupItems.forEach(function(gr) {
 					// Don't filter the disabled target here otherwise the tree structure might get broken
@@ -375,6 +378,18 @@ function processWindow(window) {
                 let popup = $E("menupopup");
 
 				let srcGroupId = event.target.getAttribute("groupid");
+
+                // Add move to current group
+                let currentGroup = GroupItems.getActiveGroupItem();
+                if (currentGroup && currentGroup.id != srcGroupId) {
+                    popup.appendChild($E("menuitem", {
+                        label: "Current Group: " + GU.splitTitle(currentGroup.getTitle()).name,
+                        value: currentGroup.id
+                    }, {
+                        command: onMoveTabs
+                    }));
+                    popup.appendChild($E("menuseparator"));
+                }
                 
                 let groups = [];
                 GroupItems.groupItems.forEach(function(gr) {

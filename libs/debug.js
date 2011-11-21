@@ -59,4 +59,9 @@ function stopDebugger() {
     }
 }
 
+function dumpStack() {  
+    for (var frame = Components.stack; frame; frame = frame.caller)  
+        LOG("STACK: " + frame.filename + ":" + frame.lineNumber);
+};
+
 // vim: set ts=4 sw=4 sts=4 et:
