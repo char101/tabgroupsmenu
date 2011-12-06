@@ -532,7 +532,8 @@ function processWindow(window) {
 					}
 				}
 				if (getPref("showGroupCount")) {
-                    title += " ";
+                    if (getPref("showTabCount"))
+                        title += " ";
 					let groupCount = GU.getNumberOfGroups();
 					if (groupCount == null && groupCount == undefined) {
 						groupCount = "-";
@@ -804,7 +805,11 @@ function processWindow(window) {
 	
 	function panoramaLoaded() {
 		GroupItems = window.TabView.getContentWindow().GroupItems;
-		GU.onPanoramaLoaded();
+        
+        // Sort groupItems
+        GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
+		
+        GU.onPanoramaLoaded();
 		updateMenuLabels();
 	}
 
