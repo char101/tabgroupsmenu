@@ -30,7 +30,7 @@ function startDebugger() {
 
                         LOG(messageType + ": " + message + "@" + fileName + "@" + lineNo + "@" + colNo + "@" + errnum + "\n");  
                         
-                        dumpStack();
+                        // dumpStack();
                         
                         // trigger debugHook
                         return false;

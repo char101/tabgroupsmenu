@@ -165,6 +165,10 @@ function createGroupFuncs(window) {
         return newGroup;
     };
 
+    GU.sortGroups = function GU_sortGroups() {
+        GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
+    };
+    
     GU.createIfNotExists = function GU_createIfNotExists(title) {
         let group = GU.findGroup(title);
         if (! group) {

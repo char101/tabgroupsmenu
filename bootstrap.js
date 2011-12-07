@@ -56,6 +56,161 @@ function processWindow(window) {
 	let WU = createWindowFuncs(window);
 	let UI = createUIFuncs(window);
 
+	// Install window preference observer
+	let prefsObserver = {
+		register: function() {
+            this.unloads = {}; // storage of unload functions
+            this.state = {};
+            for (let pref in PREFS)
+                this.state[pref] = false;
+            this.isUnload = false;
+			this.branch = Services.prefs.getBranch(PREF_BRANCH);
+			this.branch.QueryInterface(Components.interfaces.nsIPrefBranch2);
+			this.branch.addObserver("", this, false);
+            return function() {
+                prefsObserver.unregister();
+                prefsObserver.unload();
+            }
+		},
+		unregister: function() {
+			if (! this.branch) return;
+			this.branch.removeObserver("", this);
+		},
+		observe: function(subject, topic, data) {
+            if (this[data] != undefined) {
+                let status = getPref(data);
+                if (status != this.state[data]) {
+                    this[data](data, status);
+                    this.state[data] = status;
+                    let self = this;
+                    if (status)
+                        this.addUnload(data, function() {
+                            self[data](data, false)
+                        });
+                    else
+                        this.clearUnload(data);
+                }
+            }
+		},
+        trigger: function(pref) {
+            this.observe(null, null, pref);
+        },
+        // if pref is given then add callback else run callbacks
+        addUnload: function(pref, callback) {
+            if (typeof(this.unloads[pref]) == "function")
+                this.unloads[pref] = function() { this.unloads[pref](); callback(); };
+            else
+                this.unloads[pref] = callback;
+        },
+        clearUnload: function(pref) {
+            if (this.unloads[pref] != undefined)
+                delete this.unloads[pref];
+        },
+        unload: function() {
+            this.isUnload = true;
+            for (let key in this.unloads) {
+                this.unloads[key]();
+            }
+        },
+        openOnMouseOver: function(pref, status) {
+            let groupmenu = $(GROUPS_MENU_ID);
+            let tabsmenu = $(TABS_MENU_ID);
+            if (status && ! this.isUnload) {
+                if (groupmenu) {
+                    groupmenu.addEventListener("mouseover", onMouseOverMenu, true);
+                    groupmenu.addEventListener("click", onMouseOverMenu, true);
+                }
+                if (tabsmenu) {
+                    tabsmenu.addEventListener("mouseover", onMouseOverMenu, true);
+                    tabsmenu.addEventListener("click", onMouseOverMenu, true);
+                }
+            } else {
+                if (groupmenu) {
+                    groupmenu.removeEventListener("mouseover", onMouseOverMenu, true);
+                    groupmenu.removeEventListener("click", onMouseOverMenu, true);
+                }
+                if (tabsmenu) {
+                    tabsmenu.removeEventListener("mouseover", onMouseOverMenu, true);
+                    tabsmenu.removeEventListener("click", onMouseOverMenu, true);
+                }
+            }
+        },
+        showTabsMenu: function(pref, status) {
+            if (status && ! this.isUnload)
+                createTabsMenu();
+            else {
+                let menubar = $("main-menubar");
+                let tabsmenu = $(TABS_MENU_ID);
+                if (menubar && tabsmenu)
+                    menubar.removeChild(tabsmenu);
+            }
+        },
+        useCurrentGroupNameInTabsMenu: function(pref, status) {
+            updateMenuLabels();
+        },
+        showTabCount: function(pref, status) {
+            updateMenuLabels();
+        },
+        showGroupCount: function(pref, status) {
+            updateMenuLabels();
+        },
+        sortGroupNames: function(pref, status) {
+            if (status)
+                GU.sortGroups();
+        },
+        _getButtonPopup: function() {
+            let btnPopup = $(GROUPS_BTNPOPUP_ID);
+            if (! btnPopup) {
+                let tabviewButton = $(TABVIEW_BUTTON_ID);
+                btnPopup = $E("menupopup", { 
+                    id: GROUPS_BTNPOPUP_ID,
+                    class: POPUP_CLASS // this must be addes so that css rules above works
+                });
+                btnPopup.addEventListener("popupshowing", showGroupsMenuHandler, false);
+                // Prevent firefox toolbar context menu
+                btnPopup.addEventListener("context", function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }, false);
+                tabviewButton.appendChild(btnPopup);
+            }
+            return btnPopup;
+        },
+        _removeButtonPopup: function() {
+            let tabviewButton = $(TABVIEW_BUTTON_ID);
+            let btnpopup = $(GROUPS_BTNPOPUP_ID);
+            if (tabviewButton && btnpopup)
+                tabviewButton.removeChild(btnpopup);
+        },
+        addButtonMenu: function(pref, status) {
+            let tabviewButton = $(TABVIEW_BUTTON_ID);
+            if (status) {
+                let btnpopup = this._getButtonPopup();
+                if (tabviewButton && btnpopup)
+                    tabviewButton.setAttribute("type", "menu-button");
+            } else {
+                if (tabviewButton)
+                    tabviewButton.removeAttribute("type");
+            }
+            if (! (status || getPref("replacePanoramaButton")) || this.isUnload)
+                this._removeButtonPopup();
+        },
+        replacePanoramaButton: function(pref, status) {
+            let tabviewButton = $(TABVIEW_BUTTON_ID);
+            if (status) {
+                let btnpopup = this._getButtonPopup();
+                if (tabviewButton && btnpopup)
+                    tabviewButton.addEventListener("click", onMouseClickButton, true);
+            } else {
+                if (tabviewButton)
+                    tabviewButton.removeEventListener("click", onMouseClickButton, true);
+            }
+            if (! (status || getPref("addButtonMenu")) || this.isUnload)
+                this._removeButtonPopup();
+        }
+	};
+	unload(prefsObserver.register());
+
 	function onSelectTabMenuItem(event) {
         if (! event.ctrlKey) {
             // Select tab and close menu
@@ -83,6 +238,9 @@ function processWindow(window) {
 					return;
 				}
 				GU.createGroup(name, null, openInBg);
+				if (getPref("sortGroupNames")) {
+					GU.sortGroups();
+				}
 			}
 		}
 	}
@@ -113,6 +271,9 @@ function processWindow(window) {
 					return;
 				}
 				GU.createGroup(name, title, openInBg);
+				if (getPref("sortGroupNames")) {
+					GU.sortGroups();
+				}
 			}
 		}
 	}
@@ -140,6 +301,10 @@ function processWindow(window) {
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
 		if (WU.confirm("Close Group", "Really close this group and its children: \"" + title + "\" ?\n\nWarning: this operations cannot be undone!")) {
 			GU.closeGroup(group);
+			if (getPref("sortGroupNames")) {
+				// Just in case closing group change the sorting
+				GU.sortGroups();
+			}
 			updateMenuLabels();
 		}
 
@@ -153,6 +318,9 @@ function processWindow(window) {
 		if (group) {
 			if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
 				GU.closeGroup(group);
+				if (getPref("sortGroupNames")) {
+					GU.sortGroups();
+				}
 				updateMenuLabels();
 			}	
 		}
@@ -180,6 +348,9 @@ function processWindow(window) {
 					return;
 				}
 				GU.renameGroup(group, newname);
+				if (getPref("sortGroupNames")) {
+					GU.sortGroups();
+				}
 				updateMenuLabels();
 			}
 		}
@@ -218,7 +389,8 @@ function processWindow(window) {
 					// Don't filter the disabled target here otherwise the tree structure might get broken
 					groups.push([gr.id, GU.getTitle(gr)]);
                 });
-                groups.sort(function(a, b) a[1].localeCompare(b[1]));
+				// must be sorted even though sortGroupNames = true
+				groups.sort(function(a, b) a[1].localeCompare(b[1]));
                 
 				let stack = [];
 				let parent = popup;
@@ -291,7 +463,6 @@ function processWindow(window) {
 
     // Triggered by "New Tab" menuitem in group context menu
 	function onOpenNewTab(event) {
-        LOG("openNewTab");
 		let group = GroupItems.groupItem(document.popupNode.value);
         GU.createTabInGroup(group);
         let urlbar = $("urlbar");
@@ -337,8 +508,11 @@ function processWindow(window) {
 
     function onMouseClickButton(event) {
         if (event.target.id == TABVIEW_BUTTON_ID) {
-            UI.closePopup();
-            $(BUTTON_POPUP_ID).openPopup(event.target, "after_start", 0, 0, false, false);
+            let popup = $(BUTTON_POPUP_ID);
+            if (popup) {
+                popup.hidePopup();
+                popup.openPopup(event.target, "after_start", 0, 0, false, false);
+            }
             event.stopPropagation();
             event.preventDefault();
         }
@@ -395,6 +569,7 @@ function processWindow(window) {
                 GroupItems.groupItems.forEach(function(gr) {
 					groups.push([gr.id, GU.getTitle(gr)]);
 				});
+				// must be sorted even thought sortGroupNames = true
                 groups.sort(function(a, b) a[1].localeCompare(b[1]));
 
 				let stack = [];
@@ -777,37 +952,13 @@ function processWindow(window) {
 
 	// END DRAG DROP /////////////////////////////////////////////////////////////////////////////////
 	
-	function onSettings(event) {
-		let prefs = {};
-		for (let key in PREFS) {
-            if (key != "newPrefs") {
-			    prefs[key] = getPref(key);
-            }
-		}
-        // modal required for synchronous execution
-		let dialog = window.openDialog(getChromeURI("options.xul"), "Preferences", "chrome,centerscreen,modal", prefs);
-		let changedPrefs = {};
-		for (let key in prefs) {
-			if (getPref(key) != prefs[key]) {
-				changedPrefs[key] = prefs[key];
-			}
-		}
-		if (Object.keys(changedPrefs).length) {
-			// Save new set of options (cannot apply now because the uninstall checks the old value)
-			setPref("newPrefs", JSON.stringify(changedPrefs));
-			// reload addon
-			AddonManager.getAddonByID(EXT_ID, function(addon) {
-				addon.userDisabled = true;	
-				addon.userDisabled = false;
-			});
-		}
-	}
-	
 	function panoramaLoaded() {
 		GroupItems = window.TabView.getContentWindow().GroupItems;
         
         // Sort groupItems
-        GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
+        if (getPref("sortGroupNames")) {
+            GU.sortGroups();
+        }
 		
         GU.onPanoramaLoaded();
 		updateMenuLabels();
@@ -858,6 +1009,9 @@ function processWindow(window) {
 		// Sort group names first so that a parent group comes before its children
 		let groupItems = [];
 		GroupItems.groupItems.forEach(function(group) groupItems.push(group));
+
+        // Even thought group names are sorted on start, we'd still need to sort it because the user can add new groups by other means
+		// than this ext.
 		groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
 
 		let groupTitles = [];
@@ -968,13 +1122,6 @@ function processWindow(window) {
 			let mi = $E("menuitem", { label: "New Group\u2026", "class": "menu-iconic" });
 			mi.addEventListener("command", onCreateGroup, false);
 			popup.appendChild(mi);
-
-			let sep = $E("menuseparator");
-			popup.appendChild(sep);
-			
-			let mi2 = $E("menuitem", { label: "Options" });
-			mi2.addEventListener("command", onSettings, false);
-			popup.appendChild(mi2);
 		}
 	} 
 
@@ -1107,11 +1254,8 @@ function processWindow(window) {
 		menu.addEventListener("dragenter", onTabDragEnter, false);
 		menu.addEventListener("dragover", onTabDragOver, false);
 		menu.addEventListener("drop", onTabDrop, false);
-		if (getPref('openOnMouseOver')) {
-			menu.addEventListener("mouseover", onMouseOverMenu, true);
-			menu.addEventListener("click", onMouseOverMenu, true);
-		}
 		menubar.insertBefore(menu, menubar.lastChild);
+		prefsObserver.trigger("openOnMouseOver");
 		
 		let popup = $E("menupopup", {
 			id: GROUPS_POPUP_ID,
@@ -1127,9 +1271,6 @@ function processWindow(window) {
 
     // A menu in the menubar "GroupTabs" showing the list of tabs in the current group
     function createTabsMenu() {
-        if (! getPref("showTabsMenu"))
-            return function() {}; // must always return a callback because it's feed into unload
-        
         let menubar = $("main-menubar");
         let menu = $E("menu", {
 			id: TABS_MENU_ID,
@@ -1139,11 +1280,8 @@ function processWindow(window) {
 			menu.setAttribute("accesskey", "a");
 		}
         menubar.insertBefore(menu, menubar.lastChild);
-        
-        if (getPref('openOnMouseOver')) {
-            menu.addEventListener("mouseover", onMouseOverMenu, true);
-            menu.addEventListener("click", onMouseOverMenu, true);
-        }
+    
+		prefsObserver.trigger("openOnMouseOver");
 
         let popup = $E("menupopup", {
             id: TABS_POPUP_ID,
@@ -1156,52 +1294,6 @@ function processWindow(window) {
             menubar.removeChild(menu);
         };
     }
-
-	function createButtonMenu() {
-		// Embed in tabview button
-		let tabviewButton = $(TABVIEW_BUTTON_ID);
-		let btnPopup = null;
-		if (tabviewButton) {
-			if (getPref("addButtonMenu") || getPref("replacePanoramaButton")) {
-				// Embed tabgroups menu under this button
-				btnPopup = $E("menupopup", { 
-					id: GROUPS_BTNPOPUP_ID,
-					class: POPUP_CLASS // this must be addes so that css rules above works
-				});
-				listen(window, btnPopup, "popupshowing", showGroupsMenuHandler, false);
-				// Prevent firefox toolbar context menu
-				listen(window, btnPopup, "context", function(event) {
-					event.preventDefault();
-					event.stopPropagation();
-				}, false);
-				tabviewButton.appendChild(btnPopup);
-
-				if (getPref("addButtonMenu")) {
-					tabviewButton.setAttribute("type", "menu-button");
-				}
-				
-				if (getPref("replacePanoramaButton")) {
-					listen(window, tabviewButton, "click", onMouseClickButton, true);
-				}
-
-                if (getPref('openOnMouseOver')) {
-                    listen(window, tabviewButton, "mouseover", onMouseOverButton, true);
-                }
-			}
-		}
-
-		return function() {
-			if (tabviewButton) {
-				let popup = $(GROUPS_BTNPOPUP_ID);
-				if (popup) {
-					tabviewButton.removeChild(popup);
-					if (getPref("addButtonMenu")) {
-						tabviewButton.removeAttribute("type");
-					}
-				}
-			}
-		};
-	}
 
     /**
      * Create a context menu that will be displayed on right click on the menubar menu
@@ -1236,9 +1328,10 @@ function processWindow(window) {
 	}
 	
 	unload(createGroupsMenu(), window);
-	unload(createTabsMenu(), window);
-	unload(createButtonMenu(), window);
 	unload(createContextMenu(), window);
+
+	for (let key in PREFS)
+		prefsObserver.trigger(key);
 
 	listen(window, gBrowser.tabContainer, "TabSelect", onTabSelectHandler, false);
 	listen(window, gBrowser.tabContainer, "TabOpen", onTabOpenHandler, false);
@@ -1270,15 +1363,6 @@ function startup(data, reason) {
             });
         }
 
-		// Apply new prefs
-		let newPrefs = getPref("newPrefs");
-		if (newPrefs != null && newPrefs != "") {
-			let prefs = JSON.parse(newPrefs);
-			for (key in prefs) {
-				setPref(key, prefs[key]);
-			}
-		}
-
 		// Load stylesheet
 		let styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
         let styleUri = addon.getResourceURI("res/style.css");
@@ -1287,7 +1371,7 @@ function startup(data, reason) {
 			if (styleSheetService.sheetRegistered(styleUri, styleSheetService.AGENT_SHEET))
 				styleSheetService.unregisterSheet(styleUri, styleSheetService.AGENT_SHEET);
 		});
-		
+
 		watchWindows(processWindow, "navigator:browser");
 	});
 }
