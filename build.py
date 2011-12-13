@@ -34,7 +34,7 @@ zf.write('res/icon.png')
 zf.write('libs/moz-utils.js')
 zf.write('libs/my-utils.js')
 zf.write('libs/protocol.js')
-zf.write('chrome/options.xul')
+zf.write('options.xul')
 if is_debug:
     zf.write('libs/debug.js')
 else:

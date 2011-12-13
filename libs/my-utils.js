@@ -166,7 +166,8 @@ function createGroupFuncs(window) {
     };
 
     GU.sortGroups = function GU_sortGroups() {
-        GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
+        if (GroupItems)
+            GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
     };
     
     GU.createIfNotExists = function GU_createIfNotExists(title) {

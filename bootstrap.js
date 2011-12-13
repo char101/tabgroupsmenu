@@ -162,17 +162,19 @@ function processWindow(window) {
             let btnPopup = $(GROUPS_BTNPOPUP_ID);
             if (! btnPopup) {
                 let tabviewButton = $(TABVIEW_BUTTON_ID);
-                btnPopup = $E("menupopup", { 
-                    id: GROUPS_BTNPOPUP_ID,
-                    class: POPUP_CLASS // this must be addes so that css rules above works
-                });
-                btnPopup.addEventListener("popupshowing", showGroupsMenuHandler, false);
-                // Prevent firefox toolbar context menu
-                btnPopup.addEventListener("context", function(event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }, false);
-                tabviewButton.appendChild(btnPopup);
+				if (tabviewButton) {
+					btnPopup = $E("menupopup", { 
+						id: GROUPS_BTNPOPUP_ID,
+						class: POPUP_CLASS // this must be addes so that css rules above works
+					});
+					btnPopup.addEventListener("popupshowing", showGroupsMenuHandler, false);
+					// Prevent firefox toolbar context menu
+					btnPopup.addEventListener("context", function(event) {
+						event.preventDefault();
+						event.stopPropagation();
+					}, false);
+					tabviewButton.appendChild(btnPopup);
+				}
             }
             return btnPopup;
         },
@@ -955,12 +957,12 @@ function processWindow(window) {
 	function panoramaLoaded() {
 		GroupItems = window.TabView.getContentWindow().GroupItems;
         
-        // Sort groupItems
-        if (getPref("sortGroupNames")) {
-            GU.sortGroups();
-        }
-		
         GU.onPanoramaLoaded();
+        
+        // Sort groupItems
+        if (getPref("sortGroupNames"))
+            GU.sortGroups();
+		
 		updateMenuLabels();
 	}
 
@@ -1175,7 +1177,12 @@ function processWindow(window) {
 		group.reorderTabItemsBasedOnTabOrder();
 		let children = group.getChildren();
 		if (children.length > 0) {
-			group.getChildren().forEach(function(tabitem) {
+            let children = group.getChildren();
+            if (getPref("reverseTabOrder")) {
+                children = children.slice(0);
+                children.reverse();
+            }
+			children.forEach(function(tabitem) {
 				tab = tabitem.tab;
                 let cls = "menuitem-iconic";
                 if (tab.selected) {
@@ -1272,6 +1279,8 @@ function processWindow(window) {
     // A menu in the menubar "GroupTabs" showing the list of tabs in the current group
     function createTabsMenu() {
         let menubar = $("main-menubar");
+		if (! menubar)
+			return;
         let menu = $E("menu", {
 			id: TABS_MENU_ID,
             label: getTabsMenuLabel()
@@ -1289,10 +1298,6 @@ function processWindow(window) {
         });
         popup.addEventListener("popupshowing", onShowTabsMenu, false);
         menu.appendChild(popup);
-
-        return function() {
-            menubar.removeChild(menu);
-        };
     }
 
     /**
