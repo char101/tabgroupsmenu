@@ -29,12 +29,11 @@ zf = zipfile.ZipFile("../tabgroupsmenu-%s%s.xpi" % (version, '-debug' if is_debu
 zf.write('bootstrap.js')
 zf.write('install.rdf')
 zf.write('chrome.manifest')
+zf.write('options.xul')
 zf.write('res/style.css')
-zf.write('res/icon.png')
+zf.write('chrome/icon.png')
 zf.write('libs/moz-utils.js')
 zf.write('libs/my-utils.js')
-zf.write('libs/protocol.js')
-zf.write('options.xul')
 if is_debug:
     zf.write('libs/debug.js')
 else:

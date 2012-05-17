@@ -519,14 +519,17 @@ function createUIFuncs(window) {
 		if (groupsMenu && groupsMenu.open) {
 			return $(GROUPS_POPUP_ID);
 		}
-        let tabsMenu = $(TABS_MENU_ID);
-        if (tabsMenu && tabsMenu.open) {
-            return $(TABS_POPUP_ID);
-        }
 		let popup = $(BUTTON_POPUP_ID);
 		if (popup && popup.state == "open") {
 			return popup;
 		}
+        let menubar = $("main-menubar");
+        if (menubar) {
+            let menus = menubar.childNodes;
+            for (let i = 0, n = menus.length; i < n; ++i)
+                if (menus[i].menupopup.state === "open")
+                    return menus[i].menupopup;
+        }
 		return null;
 	};
 	

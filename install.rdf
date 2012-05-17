@@ -6,16 +6,17 @@
     <id>tabgroupsmenu@char.cc</id>
     <name>TabGroups Menu</name>
     <version>0.9</version>
-    <bootstrap>true</bootstrap>
 		<type>2</type>
+    <bootstrap>true</bootstrap>
 		<homepageURL>https://github.com/char101/tabgroupsmenu</homepageURL>
     <targetApplication>
       <r:Description>
-        <id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
-        <minVersion>7.0</minVersion>
-        <maxVersion>10.*</maxVersion>
+				<id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
+				<!-- https://addons.mozilla.org/en-US/firefox/pages/appversions/ -->
+        <minVersion>10.*</minVersion>
+        <maxVersion>14.*</maxVersion>
 			</r:Description>
     </targetApplication>
-		<iconURL>resource://tabgroupsmenu/res/icon.png</iconURL>
+		<iconURL>chrome://tabgroupsmenu/content/icon.png</iconURL>
 	</r:Description>
 </r:RDF>
