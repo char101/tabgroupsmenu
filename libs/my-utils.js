@@ -19,44 +19,44 @@ function $T(tab) tab._tabViewTabItem;
  * General utility functions
  */
 function createGeneralFuncs(window) {
-	const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
-    
-	let {document} = window;
+    const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+
+    let {document} = window;
 
     // Get element with id
     function $(id) {
         return document.getElementById(id);
     }
-	
-	// Create element with optional properties
-	function $E(tag, props, eventhandlers) {
-		let el = document.createElementNS(XUL_NS, tag);
-		if (props) {
-			for (let key in props) {
-				if (key == "value") {
-					el.value = props[key];
-				} else {
-					el.setAttribute(key, props[key]);
-				}
-			}
-		}
-		if (eventhandlers) {
-			for (let event in eventhandlers) {
-				el.addEventListener(event, eventhandlers[event], false);
-			}
-		}
-		return el;
-	}
 
-	function $EL(tag, children, attrs) {
-		let el = document.createElementNS(XUL_NS, tag);
-		if (typeof(children) == "object" && children instanceof Array)
-			children.forEach(function(child) el.appendChild(child));
-		if (typeof(attrs) == "object") 
-			for (let key in attrs) 
-				el.setAttribute(key, attrs[key]);
-		return el;
-	}
+    // Create element with optional properties
+    function $E(tag, props, eventhandlers) {
+        let el = document.createElementNS(XUL_NS, tag);
+        if (props) {
+            for (let key in props) {
+                if (key == "value") {
+                    el.value = props[key];
+                } else {
+                    el.setAttribute(key, props[key]);
+                }
+            }
+        }
+        if (eventhandlers) {
+            for (let event in eventhandlers) {
+                el.addEventListener(event, eventhandlers[event], false);
+            }
+        }
+        return el;
+    }
+
+    function $EL(tag, children, attrs) {
+        let el = document.createElementNS(XUL_NS, tag);
+        if (typeof(children) == "object" && children instanceof Array)
+            children.forEach(function(child) el.appendChild(child));
+        if (typeof(attrs) == "object")
+            for (let key in attrs)
+                el.setAttribute(key, attrs[key]);
+        return el;
+    }
 
     // string format
     function $F() {
@@ -83,11 +83,11 @@ function createGroupFuncs(window) {
     let {document, gBrowser} = window;
     let GroupItems = window.TabView.getContentWindow() == null ? null : window.TabView.getContentWindow().GroupItems;
     let GU = {};
-   
+
     GU.onPanoramaLoaded = function GU_onPanoramaLoaded() {
         GroupItems = window.TabView.getContentWindow().GroupItems;
     };
-    
+
     GU.findGroup = function GU_findGroup(spec) {
         let group = null;
         if (typeof(spec) === "number") {
@@ -124,14 +124,14 @@ function createGroupFuncs(window) {
             title = title.substr(pos + GROUP_SEPARATOR.length);
         return title;
     };
-    
+
     GU.getMenuLabel = function GU_getFormattedTitle(group, prefix) {
         let title = GU.getTitle(group);
         if (prefix) {
             title = GU.removePrefix(title, prefix);
         }
         let nSubGroups = 0, nTabs = group.getChildren().length;
-        let prefix = title + GROUP_SEPARATOR;
+        prefix = title + GROUP_SEPARATOR;
         GroupItems.groupItems.forEach(function(gr) {
             if (GU.isChild(gr, group)) {
                 ++nSubGroups;
@@ -145,7 +145,7 @@ function createGroupFuncs(window) {
                 if (nSubGroups)
                     title += ", ";
             }
-            if (nSubGroups) 
+            if (nSubGroups)
                 title += nSubGroups + " group" + (nSubGroups > 1 ? "s" : "");
             title += ")";
         }
@@ -169,7 +169,7 @@ function createGroupFuncs(window) {
         if (GroupItems)
             GroupItems.groupItems.sort(function(a, b) a.getTitle().localeCompare(b.getTitle()));
     };
-    
+
     GU.createIfNotExists = function GU_createIfNotExists(title) {
         let group = GU.findGroup(title);
         if (! group) {
@@ -181,39 +181,39 @@ function createGroupFuncs(window) {
 
     GU.createTabInGroup = function GU_createTabInGroup(group, onlyWhenEmpty) {
         // In newer version this automatically creates a new tab
-		GroupItems.setActiveGroupItem(group);
+        GroupItems.setActiveGroupItem(group);
         if (! onlyWhenEmpty || group.getChildren().length == 0) {
-		    return gBrowser.loadOneTab("about:blank", { inBackground: false });
+            return gBrowser.loadOneTab("about:blank", { inBackground: false });
         }
     };
 
     GU.selectGroup = function GU_selectGroup(group) {
         if (! group)
             return;
-		if (group == GroupItems.getActiveGroupItem())
-			return;
-		let tabItem = group.getActiveTab();
-		if (! tabItem) {
-			tabItem = group.getChild(0);
-		}
+        if (group == GroupItems.getActiveGroupItem())
+            return;
+        let tabItem = group.getActiveTab();
+        if (! tabItem) {
+            tabItem = group.getChild(0);
+        }
         if (! tabItem) {
             GU.createTabInGroup(group);
             tabItem = group.getChild(0);
         }
-		if (tabItem) {
-			gBrowser.selectedTab = tabItem.tab;
-			GroupItems.setActiveGroupItem(group);
-			return true;
-		}
-		return false;
-	};
+        if (tabItem) {
+            gBrowser.selectedTab = tabItem.tab;
+            GroupItems.setActiveGroupItem(group);
+            return true;
+        }
+        return false;
+    };
 
     GU.renameGroup = function GU_renameGroup(group, newname) {
         let title = group.getTitle();
-        
+
         let newtitle = GU.joinTitle(GU.splitTitle(title).prefix, newname);
         group.setTitle(newtitle);
-        
+
         let prefix = title + GROUP_SEPARATOR;
         let newprefix = newtitle + GROUP_SEPARATOR;
         GroupItems.groupItems.forEach(function (gr) {
@@ -402,7 +402,7 @@ function createWindowFuncs(window) {
     };
 
     WU.confirm = function WU_confirm(title, text) {
-        return promptService.confirm(window, title, text);        
+        return promptService.confirm(window, title, text);
     };
 
     WU.confirmCheck = function WU_confirmCheck(title, text, checkmsg) {
@@ -419,7 +419,7 @@ function createWindowFuncs(window) {
     }
 
     WU.getNumberOfTabs = function WU_getNUmberOfTabs() {
-        return gBrowser.tabs.length;  
+        return gBrowser.tabs.length;
     };
 
     WU.getTabURL = function WU_getTabURL(tab, defaultValue) {
@@ -443,8 +443,8 @@ function createWindowFuncs(window) {
 function createUIFuncs(window) {
     let {document} = window;
     let UI = {};
-	let {$} = createGeneralFuncs(window);
-    
+    let {$} = createGeneralFuncs(window);
+
     /**
      * Mark panorama loading in given element
      */
@@ -473,7 +473,7 @@ function createUIFuncs(window) {
     };
 
     UI.openPopup = function UI_openPopup(popup, group, openGroup) {
-        if (! popup) return;        
+        if (! popup) return;
         UI.clearPopup(popup);
         if (popup.id == GROUPS_POPUP_ID) {
             let menu = $(GROUPS_POPUP_ID);
@@ -514,15 +514,15 @@ function createUIFuncs(window) {
         }
     };
 
-	UI.currentPopup = function UI_currentPopup() {
+    UI.currentPopup = function UI_currentPopup() {
         let groupsMenu = $(GROUPS_MENU_ID);
-		if (groupsMenu && groupsMenu.open) {
-			return $(GROUPS_POPUP_ID);
-		}
-		let popup = $(BUTTON_POPUP_ID);
-		if (popup && popup.state == "open") {
-			return popup;
-		}
+        if (groupsMenu && groupsMenu.open) {
+            return $(GROUPS_POPUP_ID);
+        }
+        let popup = $(BUTTON_POPUP_ID);
+        if (popup && popup.state == "open") {
+            return popup;
+        }
         let menubar = $("main-menubar");
         if (menubar) {
             let menus = menubar.childNodes;
@@ -530,24 +530,24 @@ function createUIFuncs(window) {
                 if (menus[i].menupopup.state === "open")
                     return menus[i].menupopup;
         }
-		return null;
-	};
-	
-	UI.closePopup = function UI_closePopup(popup) {
-		if (popup == undefined) {
-			// Find open popup
-			popup = UI.currentPopup();
-		}
-		if (popup) {
-			popup.hidePopup();
-		}
-	};
+        return null;
+    };
 
-	UI.clearPopup = function UI_clearPopup(popup) {
-		while (popup.firstChild) {
-			popup.removeChild(popup.firstChild);
-		}
-	};
+    UI.closePopup = function UI_closePopup(popup) {
+        if (popup == undefined) {
+            // Find open popup
+            popup = UI.currentPopup();
+        }
+        if (popup) {
+            popup.hidePopup();
+        }
+    };
+
+    UI.clearPopup = function UI_clearPopup(popup) {
+        while (popup.firstChild) {
+            popup.removeChild(popup.firstChild);
+        }
+    };
 
     UI.findPopup = function UI_findPopup(element) {
         while (true) {
@@ -588,7 +588,7 @@ function createUIFuncs(window) {
         //LOG("Selected tabs are:\n" + tabs.map(function(v) v.getAttribute("label")).join("\n"));
         return tabs;
     };
-    
+
     return UI;
 }
 
