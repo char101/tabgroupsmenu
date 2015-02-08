@@ -84,10 +84,6 @@ function createGroupFuncs(window) {
     let GroupItems = window.TabView.getContentWindow() == null ? null : window.TabView.getContentWindow().GroupItems;
     let GU = {};
 
-    GU.onPanoramaLoaded = function GU_onPanoramaLoaded() {
-        GroupItems = window.TabView.getContentWindow().GroupItems;
-    };
-
     GU.findGroup = function GU_findGroup(spec) {
         let group = null;
         if (typeof(spec) === "number") {
@@ -112,8 +108,8 @@ function createGroupFuncs(window) {
         if (typeof(group) == "string")
             return group;
         let title = group.getTitle();
-        if (! title)
-            title = "(Anonymous: " + group.id + ")";
+        if (title === "")
+            title = "Unnamed " + group.id;
         return title;
     };
 
@@ -125,29 +121,18 @@ function createGroupFuncs(window) {
         return title;
     };
 
+    GU.getTabsCount = function GU_getTabsCount(group) {
+        let ntabs = group.getChildren().length;
+        for (let gr of GroupItems.groupItems)
+            if (GU.isChild(gr, group))
+                ntabs += gr.getChildren().length;
+        return ntabs;
+    };
+
     GU.getMenuLabel = function GU_getFormattedTitle(group, prefix) {
         let title = GU.getTitle(group);
         if (prefix) {
             title = GU.removePrefix(title, prefix);
-        }
-        let nSubGroups = 0, nTabs = group.getChildren().length;
-        prefix = title + GROUP_SEPARATOR;
-        GroupItems.groupItems.forEach(function(gr) {
-            if (GU.isChild(gr, group)) {
-                ++nSubGroups;
-                nTabs += gr.getChildren().length;
-            }
-        });
-        if (nTabs || nSubGroups) {
-            title += " (";
-            if (nTabs) {
-                title += nTabs + " tab" + (nTabs > 1 ? "s" : "");
-                if (nSubGroups)
-                    title += ", ";
-            }
-            if (nSubGroups)
-                title += nSubGroups + " group" + (nSubGroups > 1 ? "s" : "");
-            title += ")";
         }
         return title;
     };
@@ -377,6 +362,12 @@ function createGroupFuncs(window) {
         prompt.alert(window, "Bookmark Created", 'Bookmark folder "' + title + '" created with ' + children.length + " entr" + (children.length > 1 ? "ies" : "y"));
     };
 
+    GU.getImage = function GU_getImage(group) {
+        let ti = group.getActiveTab() || group.getChildren()[0];
+        if (ti)
+            return ti.tab.image;
+    }
+
     return GU;
 }
 
@@ -444,33 +435,6 @@ function createUIFuncs(window) {
     let {document} = window;
     let UI = {};
     let {$} = createGeneralFuncs(window);
-
-    /**
-     * Mark panorama loading in given element
-     */
-    UI.markLoading = function UI_markLoading() {
-        let menu = $(GROUPS_MENU_ID);
-        if (menu) {
-            menu.setAttribute("class", "menu-iconic");
-            menu.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
-        }
-        let btn = $(TABVIEW_BUTTON_ID);
-        if (btn) {
-            btn.setAttribute("image", "chrome://browser/skin/places/searching_16.png");
-        }
-    };
-
-    UI.unmarkLoading = function UI_unmarkLoading() {
-        let menu = $(GROUPS_MENU_ID);
-        if (menu) {
-            menu.setAttribute("class", "");
-            menu.removeAttribute("image");
-        }
-        let btn = $(TABVIEW_BUTTON_ID);
-        if (btn) {
-            btn.removeAttribute("image");
-        }
-    };
 
     UI.openPopup = function UI_openPopup(popup, group, openGroup) {
         if (! popup) return;
@@ -586,7 +550,25 @@ function createUIFuncs(window) {
             }
         }
         //LOG("Selected tabs are:\n" + tabs.map(function(v) v.getAttribute("label")).join("\n"));
-        return tabs;
+        return tabsi
+    };
+
+    UI.isTabsMenu = function UI_isTabsMenu(menu) {
+        let cls = menu.getAttribute("class");
+        if (! cls)
+            return false;
+        return cls.match(/tabgroupsmenu-tabs-menu/);
+    };
+
+    UI.withTabsMenu = function UI_withTabsMenu(func) {
+        for (let i = 0; i < 10; ++i) {
+            LOG("withTabsMenu " + i);
+            let menu = $(`TABGROUPS_MENU_LEVEL_${i}`);
+            if (menu) {
+                LOG(menu);
+                func(menu);
+            }
+        }
     };
 
     return UI;

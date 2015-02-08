@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <r:RDF xmlns="http://www.mozilla.org/2004/em-rdf#"
 	xmlns:r="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <r:Description about="urn:mozilla:install-manifest">
-    <creator>Charles G.</creator>
-    <id>tabgroupsmenu@char.cc</id>
-    <name>TabGroups Menu</name>
-    <version>0.9.2</version>
+	<r:Description about="urn:mozilla:install-manifest">
+		<creator>Charles G.</creator>
+		<id>tabgroupsmenu@char.cc</id>
+		<name>TabGroups Menu</name>
+		<version>0.9.3</version>
 		<type>2</type>
-    <bootstrap>true</bootstrap>
+		<bootstrap>true</bootstrap>
 		<homepageURL>https://github.com/char101/tabgroupsmenu</homepageURL>
-    <targetApplication>
-      <r:Description>
+		<targetApplication>
+			<r:Description>
 				<id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</id>
 				<!-- https://addons.mozilla.org/en-US/firefox/pages/appversions/ -->
-        <minVersion>10.*</minVersion>
-        <maxVersion>14.*</maxVersion>
+				<minVersion>10.*</minVersion>
+				<maxVersion>35.*</maxVersion>
 			</r:Description>
-    </targetApplication>
+		</targetApplication>
 		<iconURL>chrome://tabgroupsmenu/content/icon.png</iconURL>
 	</r:Description>
 </r:RDF>
