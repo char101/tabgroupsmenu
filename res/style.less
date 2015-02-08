@@ -1,44 +1,44 @@
 .grouptabs-popup {
 
 	// set menu item icon
-	.menuitem-iconic > .menu-iconic-left > .menu-iconic-icon { 
-		width: 16px; 
-		height: 16px; 
+	.menuitem-iconic > .menu-iconic-left > .menu-iconic-icon {
+		width: 16px;
+		height: 16px;
 		list-style-image: url(chrome://global/skin/icons/folder-item.png);
-		-moz-image-region: rect(0px, 16px, 16px, 0px); 
+		-moz-image-region: rect(0px, 16px, 16px, 0px);
 	}
-	
+
 	// set menu item icon when loading panorama
-	.menuitem-iconic[busy] > .menu-iconic-left > .menu-iconic-icon { 
-		list-style-image: url('chrome://global/skin/throbber/Throbber-small.gif') !important; 
+	.menuitem-iconic[busy] > .menu-iconic-left > .menu-iconic-icon {
+		list-style-image: url('chrome://global/skin/throbber/Throbber-small.gif') !important;
 	}
 
 	// set submenu icon
-	.menu-iconic > .menu-iconic-left > .menu-iconic-icon { 
-		list-style-image: url('chrome://browser/skin/tabview/tabview.png'); 
-		-moz-image-region: rect(0px, 90px, 16px, 72px); 
+	.menu-iconic > .menu-iconic-left > .menu-iconic-icon {
+		list-style-image: url(chrome://global/skin/icons/folder-item.png);
+		-moz-image-region: rect(0px, 16px, 16px, 0px);
 	}
-	
-	.menu-iconic:-moz-drag-over { 
+
+	.menu-iconic:-moz-drag-over {
 		text-decoration: underline;
-		border: 1px dotted #666; 
+		border: 1px dotted #666;
 	}
 
 	// current group/tab
-	.current > .menu-iconic-text { 
+	.current > .menu-iconic-text {
 		font-weight: bold !important;
 	}
-	
-	menuitem.marked .menu-iconic-text { 
-		color: #0000FF !important; 
+
+	menuitem.marked .menu-iconic-text {
+		color: #0000FF !important;
 	}
-	menuitem.unloaded .menu-iconic-text { 
+	menuitem.unloaded .menu-iconic-text {
 		opacity: 0.5;
 	}
-	menuitem.fake .menu-iconic-text { 
-		color: #B60000; 
+	menuitem.fake .menu-iconic-text {
+		color: #B60000;
 	}
-	menu.loading > .menu-iconic-left > .menu-iconic-icon { 
-		list-style-image: url(chrome://browser/skin/places/searching_16.png); 
+	menu.loading > .menu-iconic-left > .menu-iconic-icon {
+		list-style-image: url(chrome://browser/skin/places/searching_16.png);
 	}
 }

@@ -90,7 +90,7 @@ function createGroupFuncs(window) {
             return GroupItems.groupItem(spec);
         } else if (typeof(spec) === "string") {
             GroupItems.groupItems.forEach(function(gr) {
-                if (gr.getTitle() === spec) {
+                if (GU.getTitle(gr) === spec) {
                     group = gr;
                     return;
                 }
@@ -243,18 +243,7 @@ function createGroupFuncs(window) {
     };
 
     GU.closeGroup = function GU_closeGroup(group) {
-        // Close children
-        let children = [];
-        for (let i = 0, n = GroupItems.groupItems.length; i < n; ++i) {
-            if (GU.isChild(GroupItems.groupItems[i], group)) {
-                children.push(GroupItems.groupItems[i]);
-            }
-        }
-        while (children.length) {
-            let child = children.pop();
-            child.destroy();
-        }
-        group.destroy();
+        group.destroy({immediately: true});
     };
 
     // Extract display name without prefix

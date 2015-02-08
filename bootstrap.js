@@ -53,7 +53,7 @@ function processPanorama(window) {
 				this.state[pref] = false;
 			this.isUnload = false;
 			this.branch = Services.prefs.getBranch(PREF_BRANCH);
-			this.branch.QueryInterface(Components.interfaces.nsIPrefBranch2);
+			this.branch.QueryInterface(Ci.nsIPrefBranch);
 			this.branch.addObserver("", this, false);
 			return function() {
 				prefsObserver.unregister();
@@ -242,11 +242,11 @@ function processPanorama(window) {
 		if (! group) {
 			return;
 		}
-		let title = group.getTitle();
-		if (! title) {
+		if (group.getTitle() === "") {
 			// Don't create a subgroup of anonymous group
 			return;
 		}
+		let title = group.getTitle();
 		let [ret, name, openInBg] = WU.promptCheck("Create Subgroup of " + title, "Enter group title:", "", "Open in background");
 		if (ret && name != null && name.length) {
 			name = name.trim();
@@ -281,7 +281,7 @@ function processPanorama(window) {
 	function onCloseGroup(event) {
 		let menu = document.popupNode;
 		let group = GU.findGroup(menu.value);
-		let title = group.getTitle();
+		let title = GU.getTitle(group);
 		let popup = UI.findPopup(menu);
 
 		// close = really close, closeAll = undoable close, closeHidden = close previously closeAll-ed group?
@@ -302,7 +302,7 @@ function processPanorama(window) {
 	function onCloseCurrentGroup(event) {
 		let group = GroupItems.getActiveGroupItem();
 		if (group) {
-			if (WU.confirm("Close Group", "Really close this group and its children: \"" + group.getTitle() + "\" ?\n\nWarning: this operations cannot be undone!")) {
+			if (WU.confirm("Close Group", "Really close this group and its children: \"" + GU.getTitle(group) + "\" ?\n\nWarning: this operations cannot be undone!")) {
 				GU.closeGroup(group);
 				if (getPref("sortGroupNames")) {
 					GU.sortGroups();
@@ -730,7 +730,7 @@ function processPanorama(window) {
 			return;
 		if (GroupItems) {
 			let group = GroupItems.getActiveGroupItem();
-			let title = group.getTitle();
+			let title = GU.getTitle(group);
 			let parts = title.split(GROUP_SEPARATOR);
 			let curr_path = "";
 			let curr_group = null;
