@@ -539,7 +539,7 @@ function createUIFuncs(window) {
             }
         }
         //LOG("Selected tabs are:\n" + tabs.map(function(v) v.getAttribute("label")).join("\n"));
-        return tabsi
+        return tabs;
     };
 
     UI.isTabsMenu = function UI_isTabsMenu(menu) {
