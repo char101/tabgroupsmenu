@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <vbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
-	<setting type="bool" pref="extensions.tabgroupsmenu.openOnMouseOver" title="Open menu on mouse over" desc="The menu opens when the mouse is over it, you don't have to click it."/>
-	<setting type="bool" pref="extensions.tabgroupsmenu.showTabsMenu" title="Show group menu" desc="Adds another menu that lists the tabs in current active group" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.openOnMouseOver" title="Open menu on mouse over" desc="The menu opens when the mouse is over it; you don't have to click it."/>
+	<setting type="bool" pref="extensions.tabgroupsmenu.showTabsMenu" title="Show group menu" desc="Adds another menu that lists the tabs in the current active group" />
 	<setting type="bool" pref="extensions.tabgroupsmenu.showTabCount" title="Show tabs count" desc="Show the number of tabs in the tabgroups and tabs menu" />
-	<setting type="bool" pref="extensions.tabgroupsmenu.showGroupCount" title="Show groups count" desc="Show the number of group in the tabgroups menu" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.showGroupCount" title="Show groups count" desc="Show the number of groups in the tabgroups menu" />
 	<setting type="bool" pref="extensions.tabgroupsmenu.keepMenuOpen" title="Keep menu open" desc="Keep menu open after moving/closing group/tab" />
-	<setting type="bool" pref="extensions.tabgroupsmenu.sortGroupNames" title="Sort group names" desc="Sort group names on firefox startup and after renaming/closing group (only through this extension)" />
-	<setting type="bool" pref="extensions.tabgroupsmenu.addButtonMenu" title="Add menu to panorama button" desc="Adds a dropdown menu to the panorama button to show the groups" />
-	<setting type="bool" pref="extensions.tabgroupsmenu.replacePanoramaButton" title="Replace panorama button" desc="Clicking on panorama button does not open the panorama view but shows the dropdown menu" />
-	<setting type="bool" pref="extensions.tabgroupsmenu.reverseTabOrder" title="Reverse tab order" desc="Usually what we want to access in other group is the last tab in the tab bar, this option causes the tab menu item order to be reverse from the last tab in the tab bar to the first tab" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.sortGroupNames" title="Sort group names" desc="Sort group names on Firefox startup and after renaming/closing group (only through this extension)" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.addButtonMenu" title="Add menu to panorama button" desc="Adds a dropdown menu to the Panorama button to show the groups" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.replacePanoramaButton" title="Replace panorama button" desc="Clicking on Panorama button does not open the Panorama view but shows the dropdown menu" />
+	<setting type="bool" pref="extensions.tabgroupsmenu.reverseTabOrder" title="Reverse tab order" desc="Usually what we want to access in other groups is the last tab in the tab bar, this option causes the tab menu item order to be reversed from the last tab in the tab bar to the first tab" />
 </vbox>
