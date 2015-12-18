@@ -24,8 +24,12 @@ function createGeneralFuncs(window) {
     let {document} = window;
 
     // Get element with id
-    function $(id) {
-        return document.getElementById(id);
+    function $(id, id2) {
+        var el = document.getElementById(id);
+        if (! el && id2) {
+            el = document.getElementById(id2);
+        }
+        return el;
     }
 
     // Create element with optional properties
@@ -442,7 +446,7 @@ function createUIFuncs(window) {
             }
         } else {
             popup.hidePopup();
-            popup.openPopup($(TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
+            popup.openPopup($(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT), "after_pointer", 0, 0, false, false);
         }
 
         // Select given group (menu -> menupopup -> [menu|menuitem]

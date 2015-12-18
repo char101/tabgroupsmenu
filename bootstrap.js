@@ -20,6 +20,7 @@ const GROUPS_BTNPOPUP_ID = PREFIX + "btn-popup";
 const BUTTON_MENU_ID = PREFIX + "btn-menu";
 const BUTTON_POPUP_ID = PREFIX + "btn-popup";
 const TABVIEW_BUTTON_ID = "tabview-button";
+const TABVIEW_BUTTON_ID_ALT = "tabGroups-tabview-button";
 const POPUP_CLASS = PREFIX + "popup"; // for CSS styling
 const GROUP_SEPARATOR = " \u2022 ";
 
@@ -29,7 +30,25 @@ const BUTTON_RIGHT = 2;
 const KEY_CTRL = 17;
 
 function processWindow(window) {
-	window.TabView._initFrame(() => processPanorama(window));
+	window.TabView._initFrame(() => {
+		var timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+		var iter = 0;
+		var handler = {
+			notify: function() {
+				if (window.TabView.getContentWindow()) {
+					processPanorama(window);
+				} else {
+					console.log('contentWindow is null');
+					iter += 1;
+					if (iter < 10) {
+						window.TabView._initFrame();
+						timer.initWithCallback(handler, 100, Ci.nsITimer.TYPE_ONE_SHOT);
+					}
+				}
+			}
+		};
+		handler.notify();
+	});
 }
 
 function processPanorama(window) {
@@ -139,7 +158,7 @@ function processPanorama(window) {
 		_getButtonPopup: function() {
 			let btnPopup = $(GROUPS_BTNPOPUP_ID);
 			if (! btnPopup) {
-				let tabviewButton = $(TABVIEW_BUTTON_ID);
+				let tabviewButton = $(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT);
 				if (tabviewButton) {
 					btnPopup = $E("menupopup", {
 						id: GROUPS_BTNPOPUP_ID,
@@ -157,13 +176,13 @@ function processPanorama(window) {
 			return btnPopup;
 		},
 		_removeButtonPopup: function() {
-			let tabviewButton = $(TABVIEW_BUTTON_ID);
+			let tabviewButton = $(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT);
 			let btnpopup = $(GROUPS_BTNPOPUP_ID);
 			if (tabviewButton && btnpopup)
 				tabviewButton.removeChild(btnpopup);
 		},
 		addButtonMenu: function(pref, status) {
-			let tabviewButton = $(TABVIEW_BUTTON_ID);
+			let tabviewButton = $(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT);
 			if (status) {
 				let btnpopup = this._getButtonPopup();
 				if (tabviewButton && btnpopup)
@@ -176,7 +195,7 @@ function processPanorama(window) {
 				this._removeButtonPopup();
 		},
 		replacePanoramaButton: function(pref, status) {
-			let tabviewButton = $(TABVIEW_BUTTON_ID);
+			let tabviewButton = $(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT);
 			if (status) {
 				let btnpopup = this._getButtonPopup();
 				if (tabviewButton && btnpopup)
@@ -494,7 +513,7 @@ function processPanorama(window) {
 	}
 
 	function onMouseClickButton(event) {
-		if (event.target.id == TABVIEW_BUTTON_ID) {
+		if (event.target.id == TABVIEW_BUTTON_ID || event.target.id == TABVIEW_BUTTON_ID_ALT) {
 			let popup = $(BUTTON_POPUP_ID);
 			if (popup) {
 				popup.hidePopup();
@@ -742,7 +761,7 @@ function processPanorama(window) {
 				curr_group = GU.findGroup(curr_path);
 				let menu_id = "TABGROUPS_MENU_LEVEL_" + i;
 				let menu_menu = $(menu_id);
-				if (menu_menu == undefined) {
+				if (! menu_menu) {
 					menu_menu = $E("menu", { id: menu_id, label: parts[i], group_id: curr_group.id, class: "tabgroupsmenu-tabs-menu" });
 
 					let popup = $E("menupopup", { class: "grouptabs-popup" });
@@ -802,7 +821,7 @@ function processPanorama(window) {
 	}
 
 	function onTabMoveHandler(event) {
-		if (GroupItem)
+		if (GroupItems)
 			updateMenubarMenus();
 	}
 

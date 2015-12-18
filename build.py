@@ -1,3 +1,5 @@
+#!python2
+
 import sys
 import zipfile
 import re
@@ -5,7 +7,7 @@ import glob
 import os
 
 cmt_re = re.compile(r'\s*//.*')
-ver_re = re.compile(r'<version>[0-9a-z.]+</version>') 
+ver_re = re.compile(r'<version>[0-9a-z.]+</version>')
 
 if len(sys.argv) < 2:
     print "Usage: release.py version [debug:1|0, default 0]"
