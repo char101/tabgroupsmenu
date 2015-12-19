@@ -5,7 +5,7 @@
 		<creator>Charles G.</creator>
 		<id>tabgroupsmenu@char.cc</id>
 		<name>TabGroups Menu</name>
-		<version>0.9.7</version>
+		<version>0.9.8</version>
 		<type>2</type>
 		<bootstrap>true</bootstrap>
 		<homepageURL>https://github.com/char101/tabgroupsmenu</homepageURL>

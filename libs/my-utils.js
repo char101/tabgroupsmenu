@@ -446,7 +446,7 @@ function createUIFuncs(window) {
             }
         } else {
             popup.hidePopup();
-            popup.openPopup($(TABVIEW_BUTTON_ID, TABVIEW_BUTTON_ID_ALT), "after_pointer", 0, 0, false, false);
+            popup.openPopup($(TABVIEW_BUTTON_ID_ALT, TABVIEW_BUTTON_ID), "after_pointer", 0, 0, false, false);
         }
 
         // Select given group (menu -> menupopup -> [menu|menuitem]
