@@ -33,10 +33,14 @@ function processWindow(window) {
 	var timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 	var i = 0;
 	(function callback() {
-		if (window.TabView.getContentWindow())
+		if (window.TabView && window.TabView.getContentWindow())
 			processPanorama(window);
 		else if (++i < 10)
-			timer.initWithCallback({notify: function() { window.TabView._initFrame(callback); }}, 100, Ci.nsITimer.TYPE_ONE_SHOT);
+			timer.initWithCallback({
+                notify: function() {
+                    window.TabView ? window.TabView._initFrame(callback) : callback();
+                }
+            }, 100, Ci.nsITimer.TYPE_ONE_SHOT);
 	})();
 }
 
